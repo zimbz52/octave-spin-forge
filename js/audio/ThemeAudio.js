@@ -7,14 +7,17 @@
 import { dbToGain } from "./audioUtils.js";
 
 // Our 5 generic symbols map onto the sprite-naming convention every theme's sound
-// bank is expected to follow (winSymbol01-03, winSymbolWild, winSymbolScatter) —
-// this mapping is part of the abstract template, not tied to any one theme.
+// bank is expected to follow (winSymbol01-04, winSymbolWild) — this mapping is part
+// of the abstract template, not tied to any one theme. symbol04 (formerly Scatter,
+// see SpinSequence.js) is a special case: every theme bank provided so far still only
+// defines winSymbolScatter, not winSymbol04 — playSymbolWin() below falls back to it
+// dynamically rather than this map needing two entries.
 const SYMBOL_SPRITE_MAP = {
   symbol01: "winSymbol01",
   symbol02: "winSymbol02",
   symbol03: "winSymbol03",
+  symbol04: "winSymbol04",
   wild: "winSymbolWild",
-  scatter: "winSymbolScatter",
 };
 
 // winSmall sits a bit hot relative to everything else across every theme's bank —
@@ -25,6 +28,10 @@ const SMALL_WIN_VOLUME_DB = -2;
 // clearly instead of fighting the music bed for space.
 const MUSIC_DUCK_DB = -3;
 const MUSIC_DUCK_MS = 1000;
+
+// musicMain fades in from silence rather than snapping straight to its target volume —
+// see _playMusicLoop().
+const MUSIC_FADE_IN_MS = 2000;
 
 function randomIndexedName(prefix, count) {
   const n = Math.floor(Math.random() * count) + 1;
@@ -127,18 +134,15 @@ class ThemeAudio {
     this._musicVolumeBeforeDuck = null;
   }
 
-  // gameAmbLP (the ambient SFX bed) starts immediately and in parallel. gameStart, if
-  // the bank has one, plays as a one-shot intro and musicMain begins the instant it
-  // ends (chained off Howler's own "end" event, not a guessed timeout) — otherwise
-  // musicMain just starts right away.
+  // gameAmbLP (the ambient SFX bed), gameStart (if the bank has one), and musicMain
+  // all start together — musicMain no longer waits for gameStart to finish before
+  // entering; it fades in underneath it instead (see _playMusicLoop()).
   _startThemeIntro() {
     this._playAmbientLoop();
     if (this._spriteNames.has("gameStart")) {
-      const introId = this._play("gameStart");
-      this.howl.once("end", () => this._playMusicLoop(), introId);
-    } else {
-      this._playMusicLoop();
+      this._play("gameStart");
     }
+    this._playMusicLoop();
   }
 
   // SFX layer, not music — deliberately never touched by setMusicVolume(). Only
@@ -155,7 +159,12 @@ class ThemeAudio {
     if (this.musicId !== null && this.howl.playing(this.musicId)) return;
     this.musicId = this.howl.play("musicMain");
     this.howl.loop(true, this.musicId);
-    this.howl.volume(this.musicVolume, this.musicId); // respect a fader position set before this theme loaded
+    // Fades in from silence up to the fader's current target (0 if the player already
+    // muted the music) rather than snapping straight there — musicMain now starts
+    // alongside gameStart instead of waiting for it, so this softens the moment they
+    // overlap instead of both hitting full volume at once. Howler's fade() sets the
+    // starting volume itself; no separate .volume(0, id) call needed first.
+    this.howl.fade(0, this.musicVolume, MUSIC_FADE_IN_MS, this.musicId);
   }
 
   // Sets only the music track's volume (0.0-1.0), leaving UI sounds and thematic SFX
@@ -197,9 +206,20 @@ class ThemeAudio {
     if (id !== null) this.howl.volume(dbToGain(SMALL_WIN_VOLUME_DB), id);
   }
 
+  // Dynamically checks the active bank for the symbol's own sprite first; symbol04
+  // specifically falls back to winSymbolScatter if winSymbol04 isn't defined — every
+  // theme bank provided so far predates the Scatter -> Symbol04 rename (see
+  // SpinSequence.js) and still only has the old Scatter-named sprite.
   playSymbolWin(symbolId) {
     const spriteName = SYMBOL_SPRITE_MAP[symbolId];
-    if (spriteName) this._play(spriteName);
+    if (!spriteName) return;
+    if (this._spriteNames.has(spriteName)) {
+      this._play(spriteName);
+      return;
+    }
+    if (symbolId === "symbol04" && this._spriteNames.has("winSymbolScatter")) {
+      this._play("winSymbolScatter");
+    }
   }
 
   // --- Big win climax ---

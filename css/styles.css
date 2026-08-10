@@ -17,7 +17,7 @@
   --symbol-02: #38b26a;
   --symbol-03: #e0574c;
   --symbol-wild: #d4af37;
-  --symbol-scatter: #b06fe0;
+  --symbol-04: #b06fe0;
 
   --radius-md: 12px;
 }
@@ -570,6 +570,98 @@ body {
   50%, 100% { opacity: 0; }
 }
 
+/* ---------- Welcome screen (master audio gate) ---------- */
+/* Above literally everything, including the startup terminal's z-index:300 — the
+   terminal is already rendered underneath, this just covers it a moment longer. */
+.welcome-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #05060a;
+  font-family: "Courier New", monospace;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+
+.welcome-screen--fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.welcome-screen__card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 26px;
+  background: linear-gradient(180deg, var(--panel-bg-1) 0%, var(--panel-bg-2) 100%);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  text-align: center;
+}
+
+.welcome-screen__text {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  color: var(--text-light);
+}
+
+.welcome-screen__text:first-child {
+  color: var(--cabinet-accent);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 10px rgba(212, 175, 55, 0.35);
+}
+
+.welcome-screen__btn {
+  margin-top: 8px;
+  padding: 14px 34px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: "Courier New", monospace;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #241a02;
+  background: radial-gradient(circle at 35% 30%, #f6d97a, var(--cabinet-accent) 60%, #a3821f 100%);
+  animation: welcome-screen-btn-pulse 1.8s ease-in-out infinite;
+  transition: transform 0.06s ease, filter 0.15s ease;
+}
+
+.welcome-screen__btn:hover {
+  filter: brightness(1.1);
+}
+
+.welcome-screen__btn:active {
+  transform: translateY(2px);
+}
+
+.welcome-screen__btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+@keyframes welcome-screen-btn-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.55), 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 14px rgba(212, 175, 55, 0), 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+
 /* ---------- Audio profiler (debug overlay) ---------- */
 /* Sits between the fade-overlay (z-index:200) and the startup terminal (z-index:300) —
    visible straight through theme-swap fades as a persistent technical HUD, but hidden
@@ -788,8 +880,8 @@ body {
   );
 }
 
-.symbol--scatter {
-  background: var(--symbol-scatter);
+.symbol--04 {
+  background: var(--symbol-04);
   clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);
 }
 

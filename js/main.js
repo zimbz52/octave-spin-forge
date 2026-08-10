@@ -1,7 +1,9 @@
 import { systemAudio } from "./audio/SystemAudio.js";
 import { themeAudio } from "./audio/ThemeAudio.js";
+import { unlockAudioContext } from "./audio/audioUtils.js";
 import { AudioProfiler } from "./audio/AudioProfiler.js";
 import { ThemeTransition } from "./theme/ThemeTransition.js";
+import { WelcomeScreen } from "./theme/WelcomeScreen.js";
 import { StartupTerminal } from "./theme/StartupTerminal.js";
 import { THEMES } from "./theme/themeRegistry.js";
 import { GameController } from "./game/GameController.js";
@@ -207,6 +209,22 @@ async function init() {
   );
   startupTerminal.render();
   wireGlobalUISfx(startupTerminal.listEl);
+
+  // Master audio gate: loads visually on top of the terminal (already rendered and
+  // wired above) and blocks it until this one deliberate click. That click is the
+  // page's actual first user gesture — explicitly resuming the AudioContext here
+  // rather than just relying on Howler's own automatic first-gesture unlock means
+  // every hover/click sfx on the terminal underneath is guaranteed audible the
+  // instant it's reachable, not just "probably fine by then."
+  const welcomeScreen = new WelcomeScreen(
+    document.getElementById("welcome-screen"),
+    document.getElementById("welcome-start-btn")
+  );
+  await welcomeScreen.waitForStart();
+  unlockAudioContext();
+  systemAudio.play("uiClick");
+  await welcomeScreen.dismiss();
+
   const chosenThemeId = await startupTerminal.waitForSelection();
   themeSelect.value = chosenThemeId;
   await themeTransition.enterFromTerminal(chosenThemeId, startupTerminal);

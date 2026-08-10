@@ -153,6 +153,25 @@
     </div>
   </div>
 
+  <!-- Master audio gate: loads before even the startup terminal (z-index 400 vs the
+       terminal's 300), so the very first thing on screen is one deliberate click that
+       unlocks the shared AudioContext. The terminal underneath is already rendered and
+       wired the instant this is dismissed — nothing else waits on this beyond that. -->
+  <div class="welcome-screen" id="welcome-screen">
+    <div class="welcome-screen__card">
+      <p class="welcome-screen__text">Welcome to the Octave Spin Forge!</p>
+      <p class="welcome-screen__text">
+        This prototype is a pure sound design and tactile feedback engine built for iGaming.
+      </p>
+      <p class="welcome-screen__text">
+        Please use headphones for the optimal mixing and spatial experience.
+      </p>
+      <button id="welcome-start-btn" class="welcome-screen__btn" type="button">
+        Initialize Engine
+      </button>
+    </div>
+  </div>
+
   <!-- Audio profiler: a passive, always-on-top readout of every Howler sound currently
        playing across systemSounds and the active theme bank. Never intercepts clicks
        (pointer-events:none) — purely a debug/showcase HUD. -->

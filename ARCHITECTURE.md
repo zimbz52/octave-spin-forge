@@ -6,18 +6,30 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 10
-(UI harmonization: the cabinet's "metal plate" chrome was replaced with the startup terminal's
-flat dark-panel language, and Master Mute/the music fader moved into a floating dock so Spin sits
-above the fold) plus a post-Step-10 pass (rebranded to "Octave Spin Forge", the cabinet frame's
-bottom padding increased to actually clear the Spin button's own drop-shadow, and the topbar made
-responsive so the longer name doesn't crush the theme select on narrow viewports) — see "Visual
-system & layout (Step 10)" below. Earlier: Step 9 (dynamic per-theme background image injection,
-with graceful CSS-gradient fallback), and a post-Step-8 bugfix pass (theme dropdown moved to its
-own row, celebration symbols fixed to scroll with the page, profiler tag column blanked, initial
-reel measurement race that could shrink reels on first load, startup terminal hover/click sfx
-added and then fixed against the focus-mute layer silencing them). If something described here
-doesn't match the code, trust the code and update this file.
+Read this file first in any new session on this project. It reflects the state after Step 11
+(landed chronologically *after* Step 12 below — the user numbered it that way, it's not a doc
+error): `musicMain` now starts alongside `gameStart` with a 2000ms fade-in instead of waiting for
+it to finish, and Scatter was stripped of all special behavior and folded into the standard
+symbol set as `symbol04` — see "Music fade-in (Step 11)" and "Scatter removal (Step 11)" below.
+Before that: Step 12 (a "Welcome Screen" master audio gate now loads *before* the startup
+terminal — see "Welcome screen (Step 12) & the audio-gate chain" below). Earlier: Step 10 (UI
+harmonization: the cabinet's
+"metal plate" chrome was replaced with the startup terminal's flat dark-panel language, and Master
+Mute/the music fader moved into a floating dock so Spin sits above the fold) plus a post-Step-10
+pass (rebranded to "Octave Spin Forge", the cabinet frame's bottom padding increased to actually
+clear the Spin button's own drop-shadow, and the topbar made responsive so the longer name doesn't
+crush the theme select on narrow viewports) — see "Visual system & layout (Step 10)". Earlier
+still: Step 9 (dynamic per-theme background image injection, with graceful CSS-gradient
+fallback — all 4 themes now have real photos), and a post-Step-8 bugfix pass (theme dropdown moved
+to its own row, celebration symbols fixed to scroll with the page, profiler tag column blanked,
+initial reel measurement race that could shrink reels on first load, startup terminal hover/click
+sfx added and then fixed against the focus-mute layer silencing them). A 4th theme (Football) was
+added after Step 10 with zero code changes beyond the registry entry, proving out the "add a
+theme" pipeline. The project is also now deployed (a public-but-unlisted GitHub Pages site;
+`robots.txt` + `noindex` meta tag, not real access control — anyone with the direct link can still
+open it, see the repo's own deploy history for the URL) and lives in a git repo, unlike earlier in
+this file's history. If something described here doesn't match the code, trust the code and update
+this file.
 
 ---
 
@@ -35,8 +47,10 @@ doesn't match the code, trust the code and update this file.
    *variable* to build a file path (`src/audio/${themeName}Sounds.json`). `ThemeAudio` is a
    single generic engine every theme's sprite sheet plugs into via a shared naming convention
    (see "Theme sprite-sheet contract" below).
-3. **5 generic symbols only, across every theme:** `symbol01`, `symbol02`, `symbol03`, `wild`,
-   `scatter` (`SYMBOL_META` in `SpinSequence.js`). No "Symbol04" or theme-specific symbol ever.
+3. **5 generic symbols only, across every theme:** `symbol01`, `symbol02`, `symbol03`, `symbol04`,
+   `wild` (`SYMBOL_META` in `SpinSequence.js`). No theme-specific symbol ever. (As of Step 11,
+   `symbol04` — previously "scatter" — is a plain figure with no special behavior; see "Scatter
+   removal (Step 11)" below for what changed and why the rule text itself changed with it.)
 4. **Provided JSON audio configs are copied byte-for-byte, never reformatted.** They're not
    valid standalone JSON (each file is a bare `"xSounds": {...}` entry, no wrapping braces) —
    don't "fix" that in the file. Instead the loader wraps the raw text at parse time:
@@ -98,6 +112,13 @@ js/theme/
                                    adding a theme is a one-line addition here (plus its
                                    themes/<id>.json, src/audio/<id>Sounds.json, and a
                                    THEME_BACKDROPS entry in ThemeTransition.js).
+  WelcomeScreen.js                 Step 12. The master audio gate, loads *before* the terminal.
+                                   waitForStart() resolves on the "Initialize Engine" click;
+                                   dismiss() fades (CSS opacity transition) then permanently
+                                   removes itself, same pattern as StartupTerminal's dismiss().
+                                   Owns none of the actual unlock/sfx logic itself — main.js's
+                                   init() orchestrates that part, same separation of concerns as
+                                   the terminal (screen handles its own DOM/interaction only).
 
 js/audio/
   SystemAudio.js                  Global UI sprite sheet (hover/click/etc). One Howl instance,
@@ -110,6 +131,9 @@ js/audio/
                                    console.log-only placeholders (no sound designed yet); most
                                    now also call into SystemAudio/ThemeAudio.
   audioUtils.js                   Shared math: `dbToGain(db)` (dB → linear gain for Howler).
+                                   Also `unlockAudioContext()` (Step 12) — explicitly resumes
+                                   `Howler.ctx` if suspended; safe/no-op if Howler hasn't
+                                   constructed a context yet or it's already running.
   AudioProfiler.js                 Step 8. Passive debug HUD: polls both `systemAudio.howl` and
                                    `themeAudio.howl`'s own `_sounds` arrays (Howler has no "now
                                    playing" API) every 200ms and renders one row per actively-
@@ -180,18 +204,21 @@ any win celebration — only re-enabled when `spin()`'s promise resolves).
 ### Deterministic outcome generation (`SpinSequence.js`)
 
 - **Base cycle** (`SpinSequencer.next()`), loops forever: `Loss, Loss, Small1, Loss, Loss,
-  Small2, Loss, Loss, Small3, Loss, Loss, Small4, Loss, Loss, Small1, ...`. Loss paylines cycle
-  through 4 hardcoded non-matching patterns. Small win tiers: `small1`/`small2`/`small3` are
-  pure 3-of-a-kind (symbol01/02/03), `small4` is a mixed "Wild Assist"
-  (`["wild","symbol01","symbol01"]`) standing in for a nonexistent "Symbol04".
+  Small2, Loss, Loss, Small3, Loss, Loss, Small4, Loss, Loss, Small5, Loss, Loss, Small1, ...`
+  (5 small-win tiers as of Step 11, was 4). Loss paylines cycle through 4 hardcoded non-matching
+  patterns. Small win tiers: `small1`/`small2`/`small3`/`small5` are pure 3-of-a-kind
+  (symbol01/02/03/04 respectively), `small4` is a mixed "Wild Assist" (`["wild","symbol01",
+  "symbol01"]`) — kept as its own distinct tier even though `symbol04` now exists, since it
+  showcases a different *kind* of win (mixed-symbol combo), not a stand-in for a missing symbol
+  anymore (see "Scatter removal (Step 11)" below for why that reasoning changed).
 - **Big win** only ever happens via the "Force Big Win" debug button
   (`spinSequencer.forceBigWinNext()`), never in the natural cycle. Its symbol is *also*
-  deterministic: `Scatter, any, any, Scatter, any, any, ...` — the 1st/4th/7th/... forced big
-  win is Scatter, the "any" slots cycle through `symbol01, symbol02, symbol03, wild` in a
-  continuously-advancing (not reset-per-group) order. Counters (`_bigWinCount`,
-  `_bigWinAnyIndex`) live on `SpinSequencer` and advance on *arm*, not on consumption — clicking
-  the debug button twice without spinning burns two cycle slots even though only the second
-  outcome is ever played. This is a known, accepted quirk of a debug tool, not a bug.
+  deterministic: a plain round-robin across all 5 symbols with equal weight —
+  `symbol01, symbol02, symbol03, wild, symbol04, symbol01, ...` (`BIG_WIN_SYMBOLS`, cycled by
+  `_bigWinIndex`). Before Step 11 this had a special "Scatter every 3rd" cadence; that's gone,
+  see below. The counter lives on `SpinSequencer` and advances on *arm*, not on consumption —
+  clicking the debug button twice without spinning burns two cycle slots even though only the
+  second outcome is ever played. This is a known, accepted quirk of a debug tool, not a bug.
 - `buildReelTargets(payline)` derives the non-payline (top/bottom) symbols deterministically
   from the payline symbol + reel index — specifically designed so that when a win repeats the
   same symbol across all 3 reels (any big win, or `small1`-`small3`), the top/bottom rows don't
@@ -242,21 +269,22 @@ Every `<theme>Sounds.json` is expected to define (not all are required — `Them
 
 | Sprite name(s) | Meaning | Played via |
 |---|---|---|
-| `gameAmbLP` | Ambient loop, starts immediately on theme load, parallel to `gameStart` | `_playAmbientLoop()` — **SFX layer, immune to the music fader, only Master Mute silences it** |
-| `gameStart` | One-shot intro | `_startThemeIntro()` — chains to `musicMain` via Howler's `once("end", ...)` on the intro's own sound id, not a guessed timeout |
-| `musicMain` | Main background loop | `_playMusicLoop()` — **the only sprite the music fader controls**; ducked -3dB/1s during the riser (see below), on top of whatever the fader is set to |
+| `gameAmbLP` | Ambient loop, starts immediately on theme load, parallel to `gameStart`/`musicMain` | `_playAmbientLoop()` — **SFX layer, immune to the music fader, only Master Mute silences it** |
+| `gameStart` | One-shot intro | `_startThemeIntro()` — as of Step 11 fires *alongside* `musicMain`, not before it (see "Music fade-in" below) |
+| `musicMain` | Main background loop | `_playMusicLoop()` — **the only sprite the music fader controls**; fades in 0→target over 2000ms every time it starts (Step 11), and is ducked -3dB/1s during the riser (see below) on top of whatever the fader is set to |
 | `reelStart01`-`05` | Slow-mode reel start | `playReelStart()` — random pick among the 5 |
 | `reelStop01`-`05` | Slow-mode reel stop | `playReelStop()` — random pick among the 5 |
 | `reelTurbo01`-`05` | Fast-mode reel cue | `playReelTurbo()` — **replaces both start and stop** in fast mode (fires once at spin start; per-reel stop calls are suppressed) |
 | `winSmall01`-`04` | Small win layer | `playSmallWin()` — random pick, **played at -2dB by default** |
-| `winSymbol01`-`03`, `winSymbolWild`, `winSymbolScatter` | Symbol-specific win layer | `playSymbolWin(symbolId)` |
+| `winSymbol01`-`04`, `winSymbolWild` | Symbol-specific win layer | `playSymbolWin(symbolId)` — **`winSymbol04` falls back to `winSymbolScatter` if the active bank doesn't define it** (every bank provided so far doesn't — see "Scatter removal (Step 11)" below) |
 | `winBigRiser` | Big win climax buildup | `playBigWinRiser()` — ducks `musicMain` -3dB/1s at the same moment |
 | `winBigRiserEnd` | Riser payoff sting | Fired from inside `stopBigWinRiser()`'s `once("stop", ...)` callback on the riser's own id — i.e. a direct consequence of the riser stopping, not a separate timed call. Also un-ducks music (1s fade back to its pre-duck volume, not a hardcoded 1.0). |
 | `winBigT1` | Big win overlay-appear stinger | `playBigWinIntro()` |
 
 `SYMBOL_SPRITE_MAP` in `ThemeAudio.js` maps our 5 generic symbol ids to the `winSymbol*` names —
 this mapping itself is considered part of the abstract template (every theme is expected to
-follow it), not theme-specific.
+follow it), not theme-specific. `symbol04` is the one exception with a hardcoded fallback rather
+than a second map entry — see below.
 
 **Wild-combo audio rule:** when a win's payline mixes symbols (currently only `small4`, Wild +
 symbol01), `playThemeSmallWin` is called with the *distinct set* of payline symbols
@@ -270,6 +298,70 @@ superseded by a newer `loadTheme()` call is discarded silently when it resolves 
 playing). `loadTheme()` awaits all the way through the Howl's own `onload`/`onloaderror`, not
 just the JSON fetch — this matters because callers (like the fade transition) need genuine
 audio-readiness, not just "the config parsed."
+
+---
+
+## Music fade-in (Step 11)
+
+Before Step 11, `musicMain` waited for `gameStart` to finish (chained via Howler's `once("end",
+...)` on the intro's own sound id) before starting, then snapped straight to its target volume.
+As of Step 11, `_startThemeIntro()` fires `gameAmbLP`, `gameStart` (if present), and `musicMain`
+all in the same synchronous pass — no chaining, no waiting. `_playMusicLoop()` then calls
+`this.howl.fade(0, this.musicVolume, MUSIC_FADE_IN_MS, this.musicId)` (`MUSIC_FADE_IN_MS = 2000`)
+immediately after `.play()`, so it enters from silence over 2 seconds rather than colliding at
+full volume with `gameStart`'s intro stinger. Howler's `.fade()` sets the starting volume itself —
+no separate `.volume(0, id)` call needed first, and this matches the exact style already used by
+`_duckMusic()`/`_unduckMusic()` elsewhere in this file.
+
+This fade-in runs on *every* `_playMusicLoop()` call, not just the very first theme load —
+switching themes re-triggers it each time, by design (it's "how music enters," not a one-time
+intro special case). If `musicVolume` is 0 (player has the fader all the way down), the fade
+still runs, just fades in to silence — harmless, no special-casing needed.
+
+**Interaction with ducking:** `_duckMusic()`/`_unduckMusic()` read `this.howl.volume(this.musicId)`
+to capture "wherever the music actually is right now" rather than assuming a static target — this
+already handles a big win landing mid-fade-in gracefully (vanishingly unlikely in practice, since
+Force Big Win requires two clicks, but correct by construction either way, not by special-casing).
+**Interaction with the fader:** dragging the music fader while the 2s fade-in is still running
+calls `.volume()` directly, which the fade's own animation loop will simply overwrite on its next
+tick — the fade "wins" until it completes. Not addressed further; matches how the fader already
+interacts with ducking, and hasn't been reported as an issue.
+
+---
+
+## Scatter removal (Step 11)
+
+**What changed:** the "Scatter" symbol no longer exists as a distinct concept anywhere in game
+logic. It's `symbol04` now — visually identical (still the purple hexagon, `--symbol-04` /
+`.symbol--04` in `css/styles.css`, renamed 1:1 from `--symbol-scatter` / `.symbol--scatter`), but
+treated exactly like `symbol01`-`03`: a plain figure with no special behavior. Every non-negotiable
+design rule and file-map description elsewhere in this doc that used to say "scatter" has been
+updated to say `symbol04` — if you find one that still says "scatter" outside of history/rationale
+comments, that's a doc bug, fix it.
+
+**What specifically was stripped:**
+- The small-win cycle gained a 5th tier, `small5` (`Symbol04 x3`, 150), appended after `small4` —
+  `symbol04` now gets a plain-triple small win just like `symbol01`-`03`, instead of never
+  appearing in a small win at all.
+- The big-win symbol cycle (`BIG_WIN_SYMBOLS` in `SpinSequence.js`) used to give Scatter
+  guaranteed priority — the 1st/4th/7th/... forced big win was *always* Scatter, with the other
+  4 symbols cycling through the remaining slots. That's gone: it's now a flat round-robin across
+  all 5 symbols with equal weight, in array order (`symbol01, symbol02, symbol03, wild,
+  symbol04, ...`), no symbol favored. Verified live: 5 consecutive Force Big Win clicks produced
+  exactly that order with no repeats, and a 6th wrapped back to `symbol01`.
+- `LOSS_PATTERNS` had two entries referencing `"scatter"` — both now say `"symbol04"`. Purely a
+  rename; the patterns themselves (which reels show which non-matching symbols) are unchanged.
+
+**The audio-routing consequence (why the fallback in the contract table above exists):** every
+theme sprite bank provided so far (`egyptSounds.json`, `mexicoSounds.json`, `arcadeSounds.json`,
+`footballSounds.json`) predates this rename and only defines `winSymbolScatter`, not
+`winSymbol04`. Rather than block the rename on re-recording/renaming sprites in 4 audio banks,
+`ThemeAudio.playSymbolWin()` checks `_spriteNames.has("winSymbol04")` first and falls back to
+`winSymbolScatter` if it's missing — dynamically, per theme, not a one-time migration. **If a
+future theme bank ships with a real `winSymbol04` sprite, it'll be picked up automatically and
+the fallback simply won't trigger for that theme** — no code change needed either way, this is
+exactly the kind of thing the dynamic check exists to handle. Don't "clean up" the fallback
+assuming all banks have been migrated without actually checking `_spriteNames` first.
 
 ---
 
@@ -318,6 +410,48 @@ longer a "first option" footgun, since nothing loads audio automatically on page
 
 ---
 
+## Welcome screen (Step 12) & the audio-gate chain
+
+There are now *two* full-screen gates stacked on load, not one: the welcome screen
+(`#welcome-screen`, `z-index: 400`) sits **above** the startup terminal (`z-index: 300`), which
+sits above everything else. Both are fully rendered/wired in the DOM from the start — nothing
+about the terminal's own setup changed for this. The welcome screen simply covers it a moment
+longer, then gets removed to reveal it. Order in `main.js`'s `init()`:
+
+1. Everything gets set up as before (audio profiler, theme select populated, game wired, terminal
+   rendered + its rows wired with `wireGlobalUISfx(startupTerminal.listEl)`) — all of it already
+   interactive underneath, just visually and pointer-blocked by the welcome screen on top.
+2. `await welcomeScreen.waitForStart()` — blocks until "Initialize Engine" is clicked.
+3. `unlockAudioContext()` (`audioUtils.js`) — explicitly resumes `Howler.ctx` if it's suspended.
+   This is normally redundant (Howler already auto-unlocks on its own first-gesture listeners,
+   which is exactly what let the terminal act as the "first gesture" before this step existed) —
+   but the whole point of this screen is to *be* that first gesture as early and deliberately as
+   possible, not to depend on whichever click happens to land first.
+4. `systemAudio.play("uiClick")` — the handoff sound, fired explicitly here rather than through
+   the generic `data-sfx-click` pattern (the welcome screen's button deliberately doesn't carry
+   `data-sfx-hover`/`data-sfx-click` — this exact single click is a scripted step, not a generic
+   UI interaction, and double-wiring it would risk playing `uiClick` twice for one press).
+5. `await welcomeScreen.dismiss()` — fades (`.welcome-screen--fading`, CSS opacity transition,
+   `transitionend`-driven like every other fade in this app) then removes itself from the DOM
+   permanently, same pattern as `StartupTerminal.dismiss()`.
+6. Only then does `await startupTerminal.waitForSelection()` get awaited — though since the
+   terminal was blocked purely by z-index/paint-order (not by JS setup order), it was already
+   silently "waiting" underneath the whole time; this is just where the code catches up to what
+   the player can now actually see and click.
+
+**Why this exists at all:** before Step 12, the startup terminal itself was the page's first
+gesture gate — fine for unlocking *theme* audio (that's what it was built for), but its own
+`uiHover`/`uiClick` sfx (added later, see the gotcha about the focus-mute layer silencing early
+hover) were only reliably audible *after* whatever interaction happened to be the actual first
+click. The welcome screen makes "the first click" a single, explicit, unmissable step instead of
+an implicit side effect of whatever the player happens to do first.
+
+**If this ever needs a 3rd stacked gate**, follow the same shape: render+wire it fully, give it
+the next z-index up, block on its own `waitForX()` before proceeding, and make sure whatever's
+underneath is already fully set up so nothing needs to wait on *that* setup once revealed.
+
+---
+
 ## Startup terminal (gatekeeper) & the autoplay problem
 
 **The problem:** browsers block audio from playing until the page has a genuine user gesture
@@ -330,7 +464,10 @@ which unlocks audio but is by then out of sync with the intended intro sequence.
 **The fix:** `js/main.js`'s `init()` now blocks on `StartupTerminal.waitForSelection()` before
 doing anything thematic. Nothing — no `themeManager.loadTheme()`, no `themeAudio.loadTheme()`, no
 `Howl` construction beyond `SystemAudio`'s own sprite — happens until the player clicks (or
-Enter/Space-selects) a row in the terminal. That click *is* the guaranteed first gesture, and
+Enter/Space-selects) a row in the terminal. (As of Step 12, the terminal's click is no longer the
+page's *literal* first gesture — the welcome screen's "Initialize Engine" click, stacked above it,
+is — see "Welcome screen (Step 12)" above. The terminal's click is still what gates *thematic*
+audio specifically, which is what this section is actually about.)
 `ThemeTransition.enterFromTerminal(themeId, startupTerminal)` runs immediately off the back of it:
 same whoosh → fade-to-black → load mechanics as `swapTo()`, except it also calls
 `startupTerminal.dismiss()` (removes it from the DOM, permanently) at the exact point the screen

@@ -1,25 +1,29 @@
 // Deterministic outcome system — NO RNG. Every spin's result comes from a fixed,
 // cyclical sequence so every symbol and win tier gets showcased in a predictable order.
 
+// symbol04 was Scatter — stripped of its special big-win-cadence behavior (see
+// _nextBigWinSymbol()) and folded into the standard 5-symbol set as a plain figure,
+// same as symbol01-03. Visually unchanged (still the purple hexagon), just no longer
+// treated as a distinct "trigger" symbol anywhere in game logic.
 export const SYMBOL_META = {
   symbol01: { className: "symbol--01", label: "01" },
   symbol02: { className: "symbol--02", label: "02" },
   symbol03: { className: "symbol--03", label: "03" },
   wild: { className: "symbol--wild", label: "WILD" },
-  scatter: { className: "symbol--scatter", label: "SCATTER" },
+  symbol04: { className: "symbol--04", label: "04" },
 };
 
 export const SYMBOLS = Object.keys(SYMBOL_META);
 
-// The 4 small-win tiers that make up the base deterministic loop. The asset pipeline
-// is fixed at 5 generic symbols (Symbol01-03, Wild, Scatter) — there's no "Symbol04" —
-// so the 4th small win stands in as a Wild-assist combo instead of a 4th plain symbol.
-// winAmount is hardcoded per tier (no RNG), fed straight into the win counter roll-up.
+// The 5 small-win tiers that make up the base deterministic loop: one plain triple
+// per figure symbol (01-04), plus a Wild-assist combo. winAmount is hardcoded per
+// tier (no RNG), fed straight into the win counter roll-up.
 export const SMALL_WIN_TIERS = [
   { id: "small1", label: "Small Win — Symbol01 x3", payline: ["symbol01", "symbol01", "symbol01"], winAmount: 50 },
   { id: "small2", label: "Small Win — Symbol02 x3", payline: ["symbol02", "symbol02", "symbol02"], winAmount: 90 },
   { id: "small3", label: "Small Win — Symbol03 x3", payline: ["symbol03", "symbol03", "symbol03"], winAmount: 130 },
   { id: "small4", label: "Small Win — Wild Assist", payline: ["wild", "symbol01", "symbol01"], winAmount: 200 },
+  { id: "small5", label: "Small Win — Symbol04 x3", payline: ["symbol04", "symbol04", "symbol04"], winAmount: 150 },
 ];
 
 // Forced-only outcome — never appears in the natural cycle, only via the "Force Big
@@ -34,21 +38,21 @@ const SYMBOL_DISPLAY_NAME = {
   symbol02: "Symbol02",
   symbol03: "Symbol03",
   wild: "Wild",
-  scatter: "Scatter",
+  symbol04: "Symbol04",
 };
 
-// Every big win can land on any of the 5 symbols, but not with equal weight: Scatter
-// is deliberately the most frequent, cycling deterministically (no RNG) as
-// Scatter, any, any, Scatter, any, any, ... The "any" slots cycle through the 4
-// non-Scatter symbols in order rather than repeating one.
-const BIG_WIN_NON_SCATTER_SYMBOLS = ["symbol01", "symbol02", "symbol03", "wild"];
+// Every big win can land on any of the 5 symbols, cycled deterministically (no RNG)
+// with equal weight — a plain round-robin. symbol04 (formerly Scatter) used to get
+// special every-3rd-win priority here; that behavior was deliberately removed (see
+// _nextBigWinSymbol()) once it stopped being a distinct "trigger" symbol.
+const BIG_WIN_SYMBOLS = ["symbol01", "symbol02", "symbol03", "wild", "symbol04"];
 
 // Hardcoded non-matching paylines for loss spins, cycled deterministically.
 const LOSS_PATTERNS = [
   ["symbol01", "symbol02", "symbol03"],
-  ["symbol02", "wild", "scatter"],
+  ["symbol02", "wild", "symbol04"],
   ["symbol03", "symbol01", "wild"],
-  ["scatter", "symbol02", "symbol01"],
+  ["symbol04", "symbol02", "symbol01"],
 ];
 
 // Derives the non-payline (top/bottom) symbols for each reel, deterministically —
@@ -64,9 +68,9 @@ function buildReelTargets(payline) {
   });
 }
 
-// Hardcoded pattern: 2 losses, then 1 small win, cycling through all 4 small-win
+// Hardcoded pattern: 2 losses, then 1 small win, cycling through all 5 small-win
 // tiers, then looping forever — exactly: Loss, Loss, Small1, Loss, Loss, Small2,
-// Loss, Loss, Small3, Loss, Loss, Small4, Loss, Loss, Small1, ...
+// Loss, Loss, Small3, Loss, Loss, Small4, Loss, Loss, Small5, Loss, Loss, Small1, ...
 const SPIN_SEQUENCE = [];
 SMALL_WIN_TIERS.forEach((tier) => {
   SPIN_SEQUENCE.push("loss", "loss", tier.id);
@@ -98,18 +102,14 @@ class SpinSequencer {
     this.spinIndex = 0;
     this.lossIndex = 0;
     this.forcedOutcome = null;
-    this._bigWinCount = 0; // how many big wins have been armed so far
-    this._bigWinAnyIndex = 0; // position within the non-Scatter cycle
+    this._bigWinIndex = 0; // position within the uniform 5-symbol big-win cycle
   }
 
-  // Deterministic Scatter/any/any cadence: the 1st, 4th, 7th, ... big win is Scatter;
-  // the rest cycle through the 4 non-Scatter symbols in order.
+  // Deterministic round-robin across all 5 symbols, equal weight — no symbol gets
+  // special priority (see BIG_WIN_SYMBOLS).
   _nextBigWinSymbol() {
-    const isScatterTurn = this._bigWinCount % 3 === 0;
-    this._bigWinCount += 1;
-    if (isScatterTurn) return "scatter";
-    const symbol = BIG_WIN_NON_SCATTER_SYMBOLS[this._bigWinAnyIndex % BIG_WIN_NON_SCATTER_SYMBOLS.length];
-    this._bigWinAnyIndex += 1;
+    const symbol = BIG_WIN_SYMBOLS[this._bigWinIndex % BIG_WIN_SYMBOLS.length];
+    this._bigWinIndex += 1;
     return symbol;
   }
 
