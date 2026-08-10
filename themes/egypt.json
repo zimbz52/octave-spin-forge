@@ -1,0 +1,20 @@
+{
+  "themeName": "Egypt",
+  "bgImagePath": "assets/bg_egypt.jpg",
+  "background": {
+    "id": "egypt_bg",
+    "asset": "assets/themes/egypt/background.jpg"
+  },
+  "symbols": {
+    "symbol01": "assets/themes/egypt/symbol01.png",
+    "symbol02": "assets/themes/egypt/symbol02.png",
+    "symbol03": "assets/themes/egypt/symbol03.png",
+    "wild": "assets/themes/egypt/wild.png",
+    "scatter": "assets/themes/egypt/scatter.png"
+  },
+  "audio": {
+    "intro": "assets/audio/egypt/intro.mp3",
+    "outro": "assets/audio/egypt/outro.mp3",
+    "backgroundLoop": "assets/audio/egypt/bg_loop.mp3"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "themeName": "Football",
+  "bgImagePath": "assets/bg_football.jpg",
+  "background": {
+    "id": "football_bg",
+    "asset": "assets/themes/football/background.jpg"
+  },
+  "symbols": {
+    "symbol01": "assets/themes/football/symbol01.png",
+    "symbol02": "assets/themes/football/symbol02.png",
+    "symbol03": "assets/themes/football/symbol03.png",
+    "wild": "assets/themes/football/wild.png",
+    "scatter": "assets/themes/football/scatter.png"
+  },
+  "audio": {
+    "intro": "assets/audio/football/intro.mp3",
+    "outro": "assets/audio/football/outro.mp3",
+    "backgroundLoop": "assets/audio/football/bg_loop.mp3"
+  }
+}

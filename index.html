@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Octave Spin Forge — Audio Showcase Prototype</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app">
+
+    <header class="topbar">
+      <h1 class="topbar__title">OCTAVE&nbsp;SPIN&nbsp;FORGE</h1>
+
+      <div class="topbar__theme">
+        <label for="theme-select" class="topbar__theme-label">Theme</label>
+        <select id="theme-select" class="topbar__theme-select" data-sfx-hover data-sfx-click></select>
+      </div>
+    </header>
+
+    <main class="cabinet">
+      <div class="cabinet__frame">
+        <div class="cabinet__glass">
+          <div class="reels" id="reels">
+            <div class="reel" data-reel="0"><div class="reel__strip"></div></div>
+            <div class="reel" data-reel="1"><div class="reel__strip"></div></div>
+            <div class="reel" data-reel="2"><div class="reel__strip"></div></div>
+            <div class="win-line" id="win-line" aria-hidden="true"></div>
+          </div>
+
+          <div class="result-readout" id="result-readout">Ready</div>
+
+          <div class="win-counter" id="win-counter">
+            <span class="win-counter__label">WIN</span>
+            <span class="win-counter__value" id="win-counter-value">0</span>
+          </div>
+        </div>
+
+        <div class="cabinet__kickplate">
+          <div class="kickplate__row">
+            <label class="fast-toggle" data-sfx-hover>
+              <input type="checkbox" id="fast-spin-toggle" data-sfx-click />
+              <span class="fast-toggle__track"><span class="fast-toggle__thumb"></span></span>
+              <span class="fast-toggle__label">Fast</span>
+            </label>
+
+            <button id="spin-btn" class="spin-btn" type="button" data-sfx-hover data-sfx-click>
+              <span class="spin-btn__label">SPIN</span>
+            </button>
+
+            <div class="kickplate__spacer" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <section class="debug-panel">
+      <span class="debug-panel__tag">Debug</span>
+      <button id="force-big-win-btn" class="debug-btn" type="button" data-sfx-hover data-sfx-click>
+        Force Big Win
+      </button>
+    </section>
+
+  </div>
+
+  <!-- Floating audio dock: Master Mute + music fader, outside the document flow (same
+       pattern as the Signal Monitor panel, opposite corner) so it costs no vertical
+       layout space — that's what keeps Spin above the fold. -->
+  <div class="audio-dock" id="audio-dock">
+    <button
+      id="master-mute-btn"
+      class="audio-toggle-btn"
+      type="button"
+      data-sfx-hover
+      data-sfx-click
+      aria-pressed="false"
+      aria-label="Master mute"
+      title="Master mute"
+    >
+      <span class="audio-toggle-btn__icon" aria-hidden="true">&#128266;</span>
+    </button>
+
+    <div class="audio-fader" id="music-fader-wrap" data-sfx-hover title="Music volume">
+      <span class="audio-fader__icon" aria-hidden="true">&#127925;</span>
+      <input
+        type="range"
+        id="music-fader"
+        class="audio-fader__range"
+        min="0"
+        max="1"
+        step="0.01"
+        value="1"
+        aria-label="Music volume"
+      />
+    </div>
+  </div>
+
+  <!-- Unclipped overlay: winning symbols are cloned in here so their celebration
+       scale/glow can visually break past each reel's own overflow:hidden bounds. -->
+  <div class="celebration-overlay" id="celebration-overlay" aria-hidden="true"></div>
+
+  <!-- Big win climax: dims/blurs everything behind it, hosts the massive counter and
+       the coin fountain. Hidden (opacity:0, pointer-events:none) until a blackout win. -->
+  <div class="big-win-overlay" id="big-win-overlay" aria-hidden="true">
+    <div class="coin-fountain" id="coin-fountain" aria-hidden="true"></div>
+
+    <div class="big-win-widget">
+      <div class="big-win-widget__title">Grand Win</div>
+
+      <div class="big-win-counter">
+        <span class="big-win-counter__label">Win</span>
+        <span class="big-win-counter__value" id="big-win-counter-value">0</span>
+      </div>
+
+      <button id="big-win-collect-btn" class="big-win-collect-btn" type="button" data-sfx-hover data-sfx-click>
+        Collect
+      </button>
+    </div>
+  </div>
+
+  <!-- Theme transition: fades to opaque black while the new theme's config/backdrop
+       swap underneath, then lifts. Above every other overlay so it can mask anything. -->
+  <div class="fade-overlay" id="fade-overlay" aria-hidden="true"></div>
+
+  <!-- Startup gatekeeper: fully covers the cabinet on load, stays silent, and blocks
+       everything until a theme is chosen. That click is also the game's guaranteed
+       first user gesture, so no audio is ever attempted before this is dismissed.
+       Above the fade-overlay so it's on top of literally everything until removed. -->
+  <div class="startup-terminal" id="startup-terminal">
+    <div class="startup-terminal__window">
+      <div class="startup-terminal__titlebar">
+        <span class="startup-terminal__dot"></span>
+        <span class="startup-terminal__dot"></span>
+        <span class="startup-terminal__dot"></span>
+        <span class="startup-terminal__titlebar-label">OCTAVE_SPIN_FORGE.SYS</span>
+      </div>
+      <div class="startup-terminal__body">
+        <p class="startup-terminal__line">&gt; INITIALIZING CABINET...</p>
+        <p class="startup-terminal__line">&gt; SELECT A THEME TO BEGIN</p>
+        <ul
+          class="startup-terminal__list"
+          id="startup-terminal-list"
+          role="listbox"
+          aria-label="Available themes"
+        ></ul>
+        <p class="startup-terminal__line startup-terminal__line--muted">
+          &gt; AUDIO LOCKED UNTIL SELECTION<span class="startup-terminal__cursor" aria-hidden="true">_</span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio profiler: a passive, always-on-top readout of every Howler sound currently
+       playing across systemSounds and the active theme bank. Never intercepts clicks
+       (pointer-events:none) — purely a debug/showcase HUD. -->
+  <div class="audio-profiler" id="audio-profiler" aria-hidden="true">
+    <div class="audio-profiler__header">
+      <span class="audio-profiler__header-dot" aria-hidden="true"></span>
+      SIGNAL MONITOR
+    </div>
+    <div class="audio-profiler__list" id="audio-profiler-list">
+      <div class="audio-profiler__empty" id="audio-profiler-empty">— no active channels —</div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "themeName": "Mexico",
+  "bgImagePath": "assets/bg_mexico.jpg",
+  "background": {
+    "id": "mexico_bg",
+    "asset": "assets/themes/mexico/background.jpg"
+  },
+  "symbols": {
+    "symbol01": "assets/themes/mexico/symbol01.png",
+    "symbol02": "assets/themes/mexico/symbol02.png",
+    "symbol03": "assets/themes/mexico/symbol03.png",
+    "wild": "assets/themes/mexico/wild.png",
+    "scatter": "assets/themes/mexico/scatter.png"
+  },
+  "audio": {
+    "intro": "assets/audio/mexico/intro.mp3",
+    "outro": "assets/audio/mexico/outro.mp3",
+    "backgroundLoop": "assets/audio/mexico/bg_loop.mp3"
+  }
+}

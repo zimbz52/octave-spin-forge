@@ -1,0 +1,1279 @@
+:root {
+  --bg-deep: #0b0c10;
+  /* Shared "terminal" panel language — one set of tokens for every panel in the app
+     (topbar, cabinet, debug panel), not a separate "metal plate" palette for the
+     cabinet and a separate one for the startup terminal. */
+  --panel-bg-1: #1c1e24;
+  --panel-bg-2: #17181c;
+  --panel-border: #343842;
+  --control-bg: #1c1e24;
+  --control-border: #454851;
+  --cabinet-accent: #d4af37;
+  --glass-bg: #05060a;
+  --text-light: #f2ead3;
+  --text-dim: #9a9488;
+
+  --symbol-01: #4f8ef7;
+  --symbol-02: #38b26a;
+  --symbol-03: #e0574c;
+  --symbol-wild: #d4af37;
+  --symbol-scatter: #b06fe0;
+
+  --radius-md: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  /* "safe center": centers when the content fits, but falls back to start-aligned
+     when it doesn't — plain "center" would center content taller than the viewport
+     by overflowing equally above and below, and that top overflow is unreachable by
+     scrolling (page scroll only ever reveals overflow below the fold). Cabinet
+     content has grown taller over time (topbar controls, debug panel, etc.), so this
+     now matters. */
+  align-items: safe center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 20%, #1c1e24 0%, var(--bg-deep) 70%);
+  /* Applies equally whether the current backdrop is a CSS gradient (background-size is
+     a no-op on those, gradients already fill their box) or a theme's real photo
+     (ThemeTransition.js swaps background-image to a bgImagePath url) — one set of
+     rules covers both without needing to know which is currently active. */
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  /* Monospace everywhere, matching the startup terminal — the whole app is meant to
+     read as one system now, not a sans-serif cabinet bolted onto a monospace intro. */
+  font-family: "Courier New", monospace;
+  color: var(--text-light);
+  padding: 14px;
+}
+
+.app {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------- Topbar ---------- */
+/* Title + theme select share one row — this used to be two rows (a separate
+   full-width theme bar) before Master Mute/the music fader moved out to the floating
+   audio dock; with that space freed up, the select has plenty of room here instead. */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  background: linear-gradient(180deg, var(--panel-bg-1) 0%, var(--panel-bg-2) 100%);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.5);
+}
+
+.topbar__title {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0.14em;
+  color: var(--cabinet-accent);
+  text-shadow: 0 0 10px rgba(212, 175, 55, 0.35);
+  flex-shrink: 0;
+}
+
+.topbar__theme {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.topbar__theme-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.topbar__theme-select {
+  flex: 1;
+  min-width: 0;
+  max-width: 220px;
+  appearance: none;
+  background: var(--control-bg);
+  color: var(--text-light);
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  padding: 7px 30px 7px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: calc(100% - 16px) center, calc(100% - 11px) center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+}
+
+.topbar__theme-select:hover {
+  border-color: var(--cabinet-accent);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12);
+}
+
+.topbar__theme-select:active {
+  transform: translateY(1px);
+}
+
+.topbar__theme-select:focus-visible {
+  outline: 2px solid var(--cabinet-accent);
+  outline-offset: 2px;
+}
+
+/* Below ~480px (roughly where .app itself stops having room to breathe), "OCTAVE SPIN
+   FORGE" alongside the theme select has nowhere near enough width — the select was
+   measured shrinking to ~44px, showing only its dropdown arrow. Narrow viewports have
+   vertical room to spare (confirmed: Spin still sits well above the fold at 375x812
+   with this wrap active), so trade a little of that for a second row instead of
+   letting the title crush the select horizontally. */
+@media (max-width: 480px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .topbar__theme {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* ---------- Audio dock (floating: Master Mute + music fader) ---------- */
+/* Deliberately outside the .app document flow — like the Signal Monitor panel it
+   mirrors (opposite corner), it costs zero vertical layout space, which is what
+   actually gets the Spin button back above the fold. Icon-only Master Mute (no text
+   label) to stay compact as a pill; aria-label carries the accessible name instead. */
+.audio-dock {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(10, 11, 15, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.audio-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.05s ease;
+}
+
+.audio-toggle-btn__icon {
+  font-size: 0.85rem;
+  line-height: 1;
+  filter: grayscale(1) brightness(1.6);
+}
+
+.audio-toggle-btn:hover {
+  border-color: var(--cabinet-accent);
+}
+
+.audio-toggle-btn:active {
+  transform: translateY(1px);
+}
+
+.audio-toggle-btn:focus-visible {
+  outline: 2px solid var(--cabinet-accent);
+  outline-offset: 2px;
+}
+
+.audio-toggle-btn--muted {
+  background: rgba(212, 175, 55, 0.14);
+  border-color: var(--cabinet-accent);
+  color: var(--cabinet-accent);
+}
+
+.audio-toggle-btn--muted .audio-toggle-btn__icon {
+  filter: none;
+}
+
+.audio-fader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.audio-fader__icon {
+  font-size: 0.8rem;
+  line-height: 1;
+  filter: grayscale(1) brightness(1.6);
+}
+
+.audio-fader__range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 70px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--cabinet-accent) var(--fader-fill, 100%),
+    var(--panel-border) var(--fader-fill, 100%)
+  );
+  cursor: pointer;
+  outline: none;
+}
+
+.audio-fader__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--cabinet-accent);
+  box-shadow: 0 0 4px rgba(212, 175, 55, 0.6);
+  cursor: pointer;
+}
+
+.audio-fader__range::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--panel-border);
+}
+
+.audio-fader__range::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cabinet-accent);
+}
+
+.audio-fader__range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--cabinet-accent);
+  box-shadow: 0 0 4px rgba(212, 175, 55, 0.6);
+  cursor: pointer;
+}
+
+.audio-fader__range:focus-visible {
+  outline: 2px solid var(--cabinet-accent);
+  outline-offset: 2px;
+}
+
+/* Master Mute silences everything at the Howler.mute() level regardless of this
+   fader's position — dimmed here so that override is visually obvious, without
+   disabling the control (the player can still set where they want it for when they
+   unmute). */
+.audio-fader--overridden {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+}
+
+/* ---------- Cabinet ---------- */
+
+.cabinet {
+  display: flex;
+  justify-content: center;
+}
+
+/* Flat terminal-style panel — same tokens as the topbar/startup terminal, not the
+   bevelled "brushed metal" chrome this used to have. Radius/shadow/border all match
+   the rest of the app now instead of the cabinet being its own distinct design. */
+.cabinet__frame {
+  width: 100%;
+  /* Bottom padding is deliberately larger than the other three sides — the Spin
+     button's own "3D press" box-shadow (0 8px 0 solid + 0 12px 18px blur below the
+     circle) adds ~25-30px of visible weight under it that a uniform 8px padding
+     doesn't account for, so the button reads as sitting flush on the frame's edge.
+     This absorbs that shadow so the clearance below it visually matches the 8px
+     above the reels. */
+  padding: 8px 8px 34px;
+  background: linear-gradient(180deg, var(--panel-bg-1) 0%, var(--panel-bg-2) 100%);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cabinet__glass {
+  background: var(--glass-bg);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--panel-border);
+}
+
+.reels {
+  position: relative; /* anchors the win-line overlay */
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+/* ---------- Win line dash ---------- */
+/* Sits above the reels (not clipped by any single .reel's own overflow/mask) and
+   sweeps across the middle row, connecting the 3 winning symbols. Driven by WAAPI
+   from JS for precise sequencing, not a self-triggering CSS animation. */
+.win-line {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  height: 4px;
+  border-radius: 999px;
+  transform: translateY(-50%) scaleX(0);
+  transform-origin: center;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 6;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--cabinet-accent) 12%,
+    #fff 50%,
+    var(--cabinet-accent) 88%,
+    transparent
+  );
+  box-shadow: 0 0 10px 2px rgba(212, 175, 55, 0.9), 0 0 24px 8px rgba(212, 175, 55, 0.5);
+}
+
+/* ---------- Symbol celebration overlay ---------- */
+/* Winning symbols are cloned in here (position:absolute, matched to the original's
+   document-relative position) so their scale/glow celebration can visually pop outside
+   each reel's clipped viewport instead of being cut off at the reel edges.
+   position:absolute (not fixed) + document-relative coordinates in SymbolCelebration.js
+   is deliberate: a fixed-position clone stays pinned to the viewport while the page
+   scrolls out from under it, making it visibly detach from the symbol it's supposed to
+   be covering. Absolute, anchored to the (unpositioned) body's containing block, scrolls
+   together with the actual page content instead. */
+.celebration-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.symbol--celebrating {
+  will-change: transform, filter;
+}
+
+/* ---------- Theme transition fade ---------- */
+/* Sits above every other overlay (including the big win widget at z-index:100) so a
+   theme switch can mask the whole screen regardless of what's currently showing. */
+.fade-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 200;
+  transition: opacity 0.4s ease;
+}
+
+.fade-overlay--active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ---------- Startup terminal (gatekeeper) ---------- */
+/* Above literally everything, including the fade-overlay (z-index:200), so it fully
+   covers the cabinet from the first frame regardless of what else is mid-transition. */
+.startup-terminal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #05060a;
+  font-family: "Courier New", monospace;
+}
+
+.startup-terminal__window {
+  width: 100%;
+  max-width: 420px;
+  background: #0a0b0f;
+  border: 1px solid #343842;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.06), 0 20px 60px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.startup-terminal__titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #1c1e24 0%, #16171b 100%);
+  border-bottom: 1px solid #343842;
+}
+
+.startup-terminal__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #454851;
+}
+
+.startup-terminal__titlebar-label {
+  margin-left: 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.startup-terminal__body {
+  padding: 18px 18px 14px;
+}
+
+.startup-terminal__line {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  color: var(--cabinet-accent);
+  text-shadow: 0 0 8px rgba(212, 175, 55, 0.25);
+}
+
+.startup-terminal__line--muted {
+  margin: 12px 0 0;
+  color: var(--text-dim);
+  text-shadow: none;
+}
+
+.startup-terminal__cursor {
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--cabinet-accent);
+  animation: startup-terminal-blink 1s step-end infinite;
+}
+
+.startup-terminal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #23252b;
+  border-radius: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #454851 #0a0b0f;
+}
+
+.startup-terminal__list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.startup-terminal__list::-webkit-scrollbar-track {
+  background: #0a0b0f;
+}
+
+.startup-terminal__list::-webkit-scrollbar-thumb {
+  background: #343842;
+  border-radius: 4px;
+}
+
+.startup-terminal__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #1c1e24;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.startup-terminal__item:last-child {
+  border-bottom: none;
+}
+
+.startup-terminal__item-index {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.startup-terminal__item-label {
+  flex: 1;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.startup-terminal__item-arrow {
+  color: var(--cabinet-accent);
+  opacity: 0;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  transform: translateX(-4px);
+}
+
+.startup-terminal__item:hover,
+.startup-terminal__item:focus-visible {
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--cabinet-accent);
+  outline: none;
+}
+
+.startup-terminal__item:focus-visible {
+  box-shadow: inset 2px 0 0 var(--cabinet-accent);
+}
+
+.startup-terminal__item:hover .startup-terminal__item-arrow,
+.startup-terminal__item:focus-visible .startup-terminal__item-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@keyframes startup-terminal-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* ---------- Audio profiler (debug overlay) ---------- */
+/* Sits between the fade-overlay (z-index:200) and the startup terminal (z-index:300) —
+   visible straight through theme-swap fades as a persistent technical HUD, but hidden
+   behind the terminal since there's nothing to show before a theme is even loaded. A
+   cooler cyan accent (vs. the cabinet's gold) reads as "debug instrument", not "game
+   chrome", and pointer-events:none keeps it a pure readout that never blocks a click. */
+.audio-profiler {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 250;
+  width: 220px;
+  max-height: 260px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 11, 15, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(110, 230, 200, 0.25);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  font-family: "Courier New", monospace;
+  pointer-events: none;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.audio-profiler--silenced {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+
+.audio-profiler__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(110, 230, 200, 0.15);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6be6c1;
+}
+
+.audio-profiler__header-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6be6c1;
+  box-shadow: 0 0 6px #6be6c1;
+  animation: audio-profiler-blink 1.4s ease-in-out infinite;
+}
+
+.audio-profiler__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.audio-profiler__empty {
+  padding: 8px 4px;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.audio-profiler__row {
+  display: grid;
+  grid-template-columns: 38px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.22s ease, transform 0.22s ease, box-shadow 0.3s ease;
+}
+
+.audio-profiler__row--active {
+  opacity: 1;
+  transform: translateY(0);
+  animation: audio-profiler-row-glow 2.2s ease-in-out infinite;
+}
+
+.audio-profiler__row--leaving {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.audio-profiler__row--muted .audio-profiler__row-name {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.audio-profiler__row-tag {
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.audio-profiler__row-name {
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  color: #d8f5ec;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audio-profiler__row-meter {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.audio-profiler__row-meter-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #2fae8b, #6be6c1);
+  transition: width 0.18s ease;
+}
+
+@keyframes audio-profiler-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes audio-profiler-row-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(110, 230, 200, 0.18), 0 0 10px rgba(110, 230, 200, 0.1); }
+  50% { box-shadow: 0 0 0 1px rgba(110, 230, 200, 0.32), 0 0 16px rgba(110, 230, 200, 0.22); }
+}
+
+.reel {
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 20%);
+  border-radius: 8px;
+  padding: 6px;
+  mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+.reel__strip {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  will-change: transform, filter;
+}
+
+.reel__strip--spinning {
+  animation: reel-spin 0.4s linear infinite;
+  filter: blur(1.5px);
+}
+
+@keyframes reel-spin {
+  from {
+    /* Starts at the periodic filler zone, NOT translateY(0) — position 0 shows the
+       lead-in symbols (whatever was previously resting), which don't repeat. */
+    transform: translateY(calc(-1 * var(--lead-offset, 0px)));
+  }
+  to {
+    transform: translateY(calc(-1 * (var(--lead-offset, 0px) + var(--filler-cycle-height, 0px))));
+  }
+}
+
+/* ---------- Symbols (placeholders, to be replaced by themed art) ---------- */
+
+.symbol {
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.symbol__label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: rgba(0, 0, 0, 0.65);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.symbol--01 {
+  background: var(--symbol-01);
+  clip-path: circle(42% at 50% 50%);
+}
+
+.symbol--02 {
+  background: var(--symbol-02);
+  clip-path: polygon(50% 4%, 96% 96%, 4% 96%);
+}
+
+.symbol--03 {
+  background: var(--symbol-03);
+  border-radius: 8px;
+  clip-path: polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%);
+}
+
+.symbol--wild {
+  background: var(--symbol-wild);
+  /* Shifted 4.5% down from the "obvious" star coordinates so the shape's own bounding
+     box is vertically symmetric (was 0%-91%, off-center at 45.5%; now 4.5%-95.5%,
+     centered at 50%) — otherwise the win-line, which aligns to the box's true center,
+     visibly cuts low through the star specifically while looking fine on every other
+     (already-symmetric) symbol shape. */
+  clip-path: polygon(
+    50% 4.5%, 61% 39.5%, 98% 39.5%, 68% 61.5%,
+    79% 95.5%, 50% 74.5%, 21% 95.5%, 32% 61.5%,
+    2% 39.5%, 39% 39.5%
+  );
+}
+
+.symbol--scatter {
+  background: var(--symbol-scatter);
+  clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);
+}
+
+.symbol--win {
+  animation: symbol-win-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes symbol-win-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08), 0 0 0 rgba(212, 175, 55, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3), 0 0 22px 4px rgba(212, 175, 55, 0.85);
+  }
+}
+
+/* ---------- Result readout ---------- */
+
+.result-readout {
+  margin-top: 6px;
+  padding: 7px 12px;
+  background: #000;
+  border-radius: 8px;
+  border: 1px solid #1c1e24;
+  font-family: "Courier New", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-align: center;
+  text-transform: uppercase;
+  color: #6b6255;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+
+.result-readout--win {
+  color: var(--cabinet-accent);
+  text-shadow: 0 0 8px rgba(212, 175, 55, 0.7);
+}
+
+/* ---------- Win counter ---------- */
+
+.win-counter {
+  position: relative; /* anchors the label, which sits outside the centered value's flow */
+  margin-top: 4px;
+  padding: 6px 14px;
+  min-height: 40px;
+  background: #000;
+  border-radius: 8px;
+  border: 1px solid #1c1e24;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Pinned to the box's left edge and vertically centered independently of the value —
+   so it neither shifts as the digit count grows nor gets painted over by the value's
+   climax scale-up (which balloons outward from its own center, not the label's). */
+.win-counter__label {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: "Courier New", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.win-counter__value {
+  display: inline-block;
+  font-family: "Courier New", monospace;
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #514a3c;
+  text-shadow: none;
+  transform: scale(var(--climax-scale, 1));
+  transform-origin: center;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+
+/* Rolling (either type): warm gold digits + a steady glow pulse on the bezel. */
+.win-counter--rolling .win-counter__value {
+  color: var(--cabinet-accent);
+  text-shadow: 0 0 8px rgba(212, 175, 55, 0.7);
+}
+
+.win-counter--rolling {
+  animation: win-counter-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes win-counter-pulse {
+  0%, 100% {
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8), 0 0 0 rgba(212, 175, 55, 0);
+  }
+  50% {
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8), 0 0 16px 2px rgba(212, 175, 55, 0.5);
+  }
+}
+
+/* Big win: hotter/whiter digits, faster+stronger pulse, on top of the climax scale
+   transform (--climax-scale) driven from JS as the count builds. */
+.win-counter--big .win-counter__value {
+  color: #fff6d9;
+  text-shadow: 0 0 14px rgba(255, 246, 217, 0.95), 0 0 30px rgba(212, 175, 55, 0.75);
+}
+
+.win-counter--big.win-counter--rolling {
+  animation: win-counter-pulse-big 0.32s ease-in-out infinite;
+}
+
+@keyframes win-counter-pulse-big {
+  0%, 100% {
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8), 0 0 6px 1px rgba(212, 175, 55, 0.35);
+  }
+  50% {
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8), 0 0 28px 7px rgba(255, 246, 217, 0.9);
+  }
+}
+
+/* ---------- Big win overlay ---------- */
+
+.big-win-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  background: rgba(6, 5, 2, 0.74);
+  /* This alone satisfies "dim/blur the background" — no need to touch the cabinet's
+     own CSS at all, so this overlay stays fully decoupled from reel/cabinet state. */
+  backdrop-filter: blur(9px) saturate(0.65);
+  -webkit-backdrop-filter: blur(9px) saturate(0.65);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.big-win-overlay--active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.big-win-widget {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: clamp(28px, 6vw, 48px) clamp(32px, 9vw, 64px);
+  border-radius: 24px;
+  background: linear-gradient(160deg, #2c260f 0%, #17140a 100%);
+  border: 2px solid var(--cabinet-accent);
+  box-shadow: 0 0 70px 12px rgba(212, 175, 55, 0.45), 0 30px 60px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: scale(0.82);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.big-win-overlay--active .big-win-widget {
+  transform: scale(1);
+}
+
+/* WinCounter adds these two classes to the widget panel itself while the massive
+   counter is rolling, so the whole panel's glow pulses — not just the digits. */
+.big-win-widget.win-counter--rolling {
+  animation: big-win-widget-pulse 0.42s ease-in-out infinite;
+}
+
+@keyframes big-win-widget-pulse {
+  0%, 100% {
+    box-shadow: 0 0 70px 12px rgba(212, 175, 55, 0.45), 0 30px 60px rgba(0, 0, 0, 0.65),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 110px 24px rgba(255, 246, 217, 0.7), 0 30px 60px rgba(0, 0, 0, 0.65),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+}
+
+.big-win-widget__title {
+  font-family: "Courier New", monospace;
+  font-size: clamp(1rem, 3.2vw, 1.3rem);
+  font-weight: 800;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--cabinet-accent);
+  text-shadow: 0 0 14px rgba(212, 175, 55, 0.85);
+}
+
+.big-win-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.big-win-counter__label {
+  font-family: "Courier New", monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.big-win-counter__value {
+  display: inline-block;
+  font-family: "Courier New", monospace;
+  font-weight: 800;
+  font-size: clamp(2.4rem, 9vw, 4rem);
+  line-height: 1;
+  color: #fff6d9;
+  text-shadow: 0 0 20px rgba(255, 246, 217, 0.9), 0 0 44px rgba(212, 175, 55, 0.7);
+  transform: scale(var(--climax-scale, 1));
+  transform-origin: center;
+}
+
+.big-win-collect-btn {
+  margin-top: 6px;
+  padding: 12px 40px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: "Courier New", monospace;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #241a02;
+  background: radial-gradient(circle at 35% 30%, #f6d97a, var(--cabinet-accent) 60%, #a3821f 100%);
+  box-shadow: 0 6px 0 #7a611a, 0 10px 18px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.5);
+  transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.15s ease;
+}
+
+.big-win-collect-btn:hover {
+  filter: brightness(1.08);
+}
+
+.big-win-collect-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 3px 0 #7a611a, 0 6px 10px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+
+.big-win-collect-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+/* ---------- Coin fountain ---------- */
+/* Spans the full overlay so falling coins can travel anywhere on screen; individual
+   coin position/size/trajectory is randomized per-coin from JS (purely cosmetic
+   particle variation — not game-outcome RNG, which stays fully deterministic). */
+.coin-fountain {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.coin-fountain__coin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #fff8e0, var(--cabinet-accent) 55%, #8a6a17 100%);
+  box-shadow: 0 0 6px rgba(212, 175, 55, 0.85), inset 0 1px 2px rgba(255, 255, 255, 0.7);
+}
+
+/* ---------- Kickplate / Controls ---------- */
+
+.cabinet__kickplate {
+  display: flex;
+  justify-content: center;
+}
+
+.kickplate__row {
+  display: grid;
+  grid-template-columns: 74px auto 74px;
+  align-items: center;
+  justify-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.kickplate__spacer {
+  width: 74px;
+}
+
+/* ---------- Fast-spin toggle ---------- */
+
+.fast-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.fast-toggle input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.fast-toggle__track {
+  position: relative;
+  width: 42px;
+  height: 22px;
+  background: #1c1e24;
+  border: 1px solid #454851;
+  border-radius: 999px;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fast-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.fast-toggle input:checked + .fast-toggle__track {
+  background: rgba(212, 175, 55, 0.25);
+  border-color: var(--cabinet-accent);
+}
+
+.fast-toggle input:checked + .fast-toggle__track .fast-toggle__thumb {
+  transform: translateX(20px);
+  background: var(--cabinet-accent);
+}
+
+.fast-toggle:hover .fast-toggle__track {
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12);
+}
+
+.fast-toggle input:active + .fast-toggle__track {
+  transform: scale(0.94);
+}
+
+.fast-toggle__label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.spin-btn {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #241a02;
+  background: radial-gradient(circle at 35% 30%, #f6d97a, var(--cabinet-accent) 60%, #a3821f 100%);
+  box-shadow:
+    0 8px 0 #7a611a,
+    0 12px 18px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.5);
+  transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.15s ease;
+}
+
+.spin-btn:hover {
+  filter: brightness(1.08);
+}
+
+.spin-btn:active {
+  transform: translateY(6px);
+  box-shadow:
+    0 2px 0 #7a611a,
+    0 4px 10px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+}
+
+.spin-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+.spin-btn:disabled {
+  cursor: default;
+  filter: grayscale(0.4) brightness(0.85);
+  transform: none;
+}
+
+.fast-toggle input:disabled {
+  cursor: default;
+}
+
+.fast-toggle:has(input:disabled) {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---------- Debug panel (dev tool — deliberately outside the cabinet's polish) ---------- */
+
+.debug-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 14px;
+  border: 1px dashed #5a4a2e;
+  border-radius: 10px;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(212, 175, 55, 0.05),
+    rgba(212, 175, 55, 0.05) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+.debug-panel__tag {
+  font-family: "Courier New", monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a3821f;
+  border: 1px solid #5a4a2e;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.debug-btn {
+  font-family: "Courier New", monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  background: #23252b;
+  border: 1px solid #5a4a2e;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.05s ease;
+}
+
+.debug-btn:hover {
+  border-color: var(--cabinet-accent);
+  background: #2b2d34;
+}
+
+.debug-btn:active {
+  transform: translateY(1px);
+}
+
+.debug-btn:focus-visible {
+  outline: 2px solid var(--cabinet-accent);
+  outline-offset: 2px;
+}
+
+.debug-btn--armed {
+  color: #241a02;
+  background: repeating-linear-gradient(
+    135deg,
+    #f6d97a,
+    #f6d97a 8px,
+    var(--cabinet-accent) 8px,
+    var(--cabinet-accent) 16px
+  );
+  border-color: var(--cabinet-accent);
+  animation: debug-armed-pulse 1s ease-in-out infinite;
+}
+
+@keyframes debug-armed-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(212, 175, 55, 0);
+  }
+  50% {
+    box-shadow: 0 0 14px 2px rgba(212, 175, 55, 0.6);
+  }
+}
