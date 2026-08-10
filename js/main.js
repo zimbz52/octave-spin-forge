@@ -1,6 +1,7 @@
 import { systemAudio } from "./audio/SystemAudio.js";
 import { themeAudio } from "./audio/ThemeAudio.js";
 import { unlockAudioContext } from "./audio/audioUtils.js";
+import { playPowerBetOn, playPowerBetOff } from "./audio/audioHooks.js";
 import { AudioProfiler } from "./audio/AudioProfiler.js";
 import { ThemeTransition } from "./theme/ThemeTransition.js";
 import { WelcomeScreen } from "./theme/WelcomeScreen.js";
@@ -121,7 +122,8 @@ function wireGame() {
   const resultEl = document.getElementById("result-readout");
   const spinBtn = document.getElementById("spin-btn");
   const fastToggle = document.getElementById("fast-spin-toggle");
-  const forceBigWinBtn = document.getElementById("force-big-win-btn");
+  const powerbetBtn = document.getElementById("powerbet-toggle-btn");
+  const cabinetFrameEl = document.querySelector(".cabinet__frame");
   const winLineEl = document.getElementById("win-line");
   const celebrationOverlayEl = document.getElementById("celebration-overlay");
   const winCounterEl = document.getElementById("win-counter");
@@ -152,22 +154,41 @@ function wireGame() {
     game.setFastMode(event.target.checked);
   });
 
-  function syncForceBtnState() {
+  // Purely visual/state sync, driven directly off spinSequencer.isForceArmed() (no
+  // separate local boolean to risk desyncing from it). Deliberately not called while a
+  // spin is in flight — see spinBtn's click handler below — so the toggle/glow stay
+  // fully on through the *entire* Powerbet spin (reels, celebration, big win overlay,
+  // roll-up, Collect), not just until the outcome is decided at spin start. That's
+  // what makes the reset an actual auto-reset tied to the win sequence completing,
+  // not an instant one tied to the spin merely starting.
+  function syncPowerbetUI() {
     const armed = spinSequencer.isForceArmed();
-    forceBigWinBtn.classList.toggle("debug-btn--armed", armed);
-    forceBigWinBtn.textContent = armed ? "Armed — press Spin" : "Force Big Win";
+    powerbetBtn.classList.toggle("powerbet-toggle--active", armed);
+    powerbetBtn.setAttribute("aria-pressed", String(armed));
+    cabinetFrameEl.classList.toggle("cabinet__frame--powerbet", armed);
   }
 
-  forceBigWinBtn.addEventListener("click", () => {
-    spinSequencer.forceBigWinNext();
-    syncForceBtnState();
+  powerbetBtn.addEventListener("click", () => {
+    if (spinSequencer.isForceArmed()) {
+      spinSequencer.disarmForcedBigWin();
+      playPowerBetOff();
+    } else {
+      spinSequencer.forceBigWinNext();
+      playPowerBetOn();
+    }
+    syncPowerbetUI();
   });
 
   spinBtn.addEventListener("click", async () => {
     spinBtn.disabled = true;
+    powerbetBtn.disabled = true;
     await game.spin();
-    syncForceBtnState(); // reflects that a forced outcome, if any, was just consumed
+    // Auto-reset: only reached once the whole win sequence (if this was a Powerbet
+    // spin) has fully played out and been collected — see the comment on
+    // syncPowerbetUI() above for why this specific timing matters.
+    syncPowerbetUI();
     spinBtn.disabled = false;
+    powerbetBtn.disabled = false;
   });
 
   return game;

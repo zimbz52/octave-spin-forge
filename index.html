@@ -51,18 +51,25 @@
               <span class="spin-btn__label">SPIN</span>
             </button>
 
-            <div class="kickplate__spacer" aria-hidden="true"></div>
+            <!-- Arms the next spin to bypass the normal Loss->Loss->Win cycle and land
+                 an instant Grand Win. No data-sfx-click: on/off get their own distinct
+                 powerBetOn/powerBetOff cues (main.js), not the generic uiClick. -->
+            <button
+              id="powerbet-toggle-btn"
+              class="powerbet-toggle"
+              type="button"
+              data-sfx-hover
+              aria-pressed="false"
+              aria-label="Powerbet"
+              title="Powerbet — force the next spin into a Grand Win"
+            >
+              <span class="powerbet-toggle__icon" aria-hidden="true">&#9889;</span>
+              <span class="powerbet-toggle__label">Powerbet</span>
+            </button>
           </div>
         </div>
       </div>
     </main>
-
-    <section class="debug-panel">
-      <span class="debug-panel__tag">Debug</span>
-      <button id="force-big-win-btn" class="debug-btn" type="button" data-sfx-hover data-sfx-click>
-        Force Big Win
-      </button>
-    </section>
 
   </div>
 

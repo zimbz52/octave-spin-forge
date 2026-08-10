@@ -110,3 +110,17 @@ export function stopBigWinRiser() {
   console.log("[audio hook] stopBigWinRiser()");
   themeAudio.stopBigWinRiser();
 }
+
+// Fires the instant the Powerbet toggle turns on/off (main.js). Deliberately routed
+// through ThemeAudio rather than the generic data-sfx-click pattern — themeAudio
+// already no-ops safely if powerBetOn/powerBetOff aren't defined in the active bank,
+// which no theme currently provides.
+export function playPowerBetOn() {
+  console.log("[audio hook] playPowerBetOn()");
+  themeAudio.playPowerBetOn();
+}
+
+export function playPowerBetOff() {
+  console.log("[audio hook] playPowerBetOff()");
+  themeAudio.playPowerBetOff();
+}

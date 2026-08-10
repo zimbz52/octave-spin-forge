@@ -6,7 +6,10 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 11
+Read this file first in any new session on this project. It reflects the state after Step 13
+(the debug "Force Big Win" button is gone — forcing a blackout is now a real, prominent
+"Powerbet" toggle on the cabinet itself, with a persistent high-energy glow while armed and an
+auto-reset once the win is fully collected — see "Powerbet (Step 13)" below). Before that: Step 11
 (landed chronologically *after* Step 12 below — the user numbered it that way, it's not a doc
 error): `musicMain` now starts alongside `gameStart` with a 2000ms fade-in instead of waiting for
 it to finish, and Scatter was stripped of all special behavior and folded into the standard
@@ -211,14 +214,16 @@ any win celebration — only re-enabled when `spin()`'s promise resolves).
   "symbol01"]`) — kept as its own distinct tier even though `symbol04` now exists, since it
   showcases a different *kind* of win (mixed-symbol combo), not a stand-in for a missing symbol
   anymore (see "Scatter removal (Step 11)" below for why that reasoning changed).
-- **Big win** only ever happens via the "Force Big Win" debug button
-  (`spinSequencer.forceBigWinNext()`), never in the natural cycle. Its symbol is *also*
-  deterministic: a plain round-robin across all 5 symbols with equal weight —
-  `symbol01, symbol02, symbol03, wild, symbol04, symbol01, ...` (`BIG_WIN_SYMBOLS`, cycled by
-  `_bigWinIndex`). Before Step 11 this had a special "Scatter every 3rd" cadence; that's gone,
-  see below. The counter lives on `SpinSequencer` and advances on *arm*, not on consumption —
-  clicking the debug button twice without spinning burns two cycle slots even though only the
-  second outcome is ever played. This is a known, accepted quirk of a debug tool, not a bug.
+- **Big win** only ever happens via `spinSequencer.forceBigWinNext()`, never in the natural
+  cycle — as of Step 13 this is armed by the player-facing Powerbet toggle, not a hidden debug
+  button (see "Powerbet (Step 13)" below). Its symbol is *also* deterministic: a plain
+  round-robin across all 5 symbols with equal weight — `symbol01, symbol02, symbol03, wild,
+  symbol04, symbol01, ...` (`BIG_WIN_SYMBOLS`, cycled by `_bigWinIndex`). Before Step 11 this had
+  a special "Scatter every 3rd" cadence; that's gone, see below. The counter lives on
+  `SpinSequencer` and advances on *arm*, not on consumption — toggling Powerbet on/off/on again
+  without spinning burns two cycle slots even though only the second armed outcome is ever
+  played. This is a known, accepted quirk (inherited unchanged from the old debug button), not a
+  bug worth "fixing."
 - `buildReelTargets(payline)` derives the non-payline (top/bottom) symbols deterministically
   from the payline symbol + reel index — specifically designed so that when a win repeats the
   same symbol across all 3 reels (any big win, or `small1`-`small3`), the top/bottom rows don't
@@ -362,6 +367,67 @@ future theme bank ships with a real `winSymbol04` sprite, it'll be picked up aut
 the fallback simply won't trigger for that theme** — no code change needed either way, this is
 exactly the kind of thing the dynamic check exists to handle. Don't "clean up" the fallback
 assuming all banks have been migrated without actually checking `_spriteNames` first.
+
+---
+
+## Powerbet (Step 13)
+
+**What changed:** the "Force Big Win" debug button (`#force-big-win-btn`, `.debug-panel`) is
+gone — both the element and its CSS (`.debug-panel*`, `.debug-btn*`, `@keyframes
+debug-armed-pulse`) were deleted outright, not just hidden. The exact same underlying mechanic
+(`spinSequencer.forceBigWinNext()` / `isForceArmed()`) is now armed by a real, permanent,
+player-facing control: the Powerbet toggle (`#powerbet-toggle-btn`, `.powerbet-toggle`) in the
+kickplate row, replacing what used to be an empty `.kickplate__spacer` in the same 74px column
+(Fast toggle and Spin stay exactly where they were).
+
+**State machine, in `main.js`'s `wireGame()`:**
+- Click while unarmed → `spinSequencer.forceBigWinNext()` (arms it, advances `_bigWinIndex` —
+  see "Deterministic outcome generation" above) → `playPowerBetOn()`.
+- Click while armed → `spinSequencer.disarmForcedBigWin()` (new method on `SpinSequencer`,
+  just clears `forcedOutcome` — deliberately does *not* roll back `_bigWinIndex`, same "arms on
+  arm" accounting the old debug button already had) → `playPowerBetOff()`.
+- There's no separate local boolean tracking "is Powerbet on" — the toggle/glow are driven
+  directly off `spinSequencer.isForceArmed()` every time `syncPowerbetUI()` runs, so there's
+  nothing to desync.
+
+**The auto-reset timing is the one subtle part.** `syncPowerbetUI()` is *not* called the instant
+`spinSequencer.next()` consumes the forced outcome (which happens immediately at the start of
+`GameController.spin()`, before the reels even move) — it's called only in `main.js`'s
+`spinBtn` click handler, *after* `await game.spin()` resolves. `game.spin()` doesn't resolve
+until the *entire* win presentation finishes (reels land, celebration plays, the big win overlay
+appears, the 8s counter rolls up, and the player clicks Collect — see `BigWinWidget.show()`,
+"The spin flow, end to end" above). So the toggle button and the cabinet's glow both stay fully
+lit for the whole Powerbet spin, not just until the outcome is decided, and only clear once the
+player has actually collected — that's what makes this a real *auto-reset tied to completion*,
+not an instant reset tied to consumption. If this ever gets refactored, preserve that gap; syncing
+too early is the obvious-looking bug to accidentally reintroduce.
+
+**No sound on auto-reset, by design:** unlike the manual toggle, the auto-reset path does not
+call `playPowerBetOff()` — the spec ties the on/off cues to the toggle action itself (requirement
+3), while auto-reset is described purely in state/visual terms (requirement 5, no audio
+mentioned). Also avoids stacking another cue on top of an already sound-dense moment (riser-end,
+big win stinger, roll-up climax all already fire around Collect).
+
+**Visuals:** `.cabinet__frame--powerbet` adds a pulsing colored box-shadow/border on top of the
+frame's existing base shadow (never replaces it) via `--powerbet-accent` (`#ff5c3d`) — a new,
+deliberately non-gold accent color so "Powerbet armed" reads as a distinct mode at a glance
+instead of blending into the app's existing gold "win" highlighting everywhere else. The toggle
+button pulses with the same color/rhythm so the button and the cabinet read as one state.
+
+**Audio safety (requirement 3):** `powerBetOn`/`powerBetOff` don't exist in any theme bank yet.
+`ThemeAudio.playPowerBetOn()`/`playPowerBetOff()` check `_spriteNames.has(...)` before calling
+`_play()`, exactly the same defensive pattern as Step 11's Scatter fallback (see above) — silent
+no-op today, picked up automatically the moment a bank actually defines these, no code change
+needed either way.
+
+**Incidental fix while wiring this up:** the Powerbet toggle sits in the kickplate's bottom-right
+74px column — which turned out to already geometrically overlap the Signal Monitor panel
+(`.audio-profiler`, fixed bottom-right) at the app's standard ~846px-wide test viewport. This
+overlap existed before Step 13 too (the column was just an empty spacer, so it was invisible);
+it became a real visual bug the moment a real button with real content landed there.
+`.audio-profiler`'s width was reduced 220px → 168px (and its row's `grid-template-columns`
+tightened to match) specifically to clear the cabinet's right edge at that viewport width — see
+the gotcha below if this regresses.
 
 ---
 
@@ -798,6 +864,32 @@ floating dock). **The floating dock was chosen.** What that means concretely:
    remove this call assuming `showInitial()`'s own measurement is sufficient; that's exactly the
    assumption that broke. (Every *spin* is safe already — `buildStrip()` re-measures every time —
    this only ever affected the very first static reveal.)
+10. **The two `position: fixed`, viewport-anchored corner panels (`.audio-dock` bottom-left,
+    `.audio-profiler` "Signal Monitor" bottom-right) can silently overlap real cabinet content**
+    — neither panel's position accounts for `.app`'s or `.cabinet__frame`'s actual edges in any
+    way (they're anchored to the *viewport*). Two distinct instances of this hit in practice:
+    - **Desktop/horizontal** (~846px test viewport): `.app`'s 480px max-width plus both panels'
+      own widths didn't leave much slack — invisible for a long time because nothing was ever
+      placed in the kickplate's bottom-right corner besides an empty spacer, until Step 13's
+      Powerbet toggle landed there. Fixed by narrowing `.audio-profiler` from 220px to 168px
+      (see "Powerbet (Step 13)").
+    - **Mobile/vertical** (375x812 tested): `.app` is close to full-width there, so both docks
+      span nearly the cabinet's whole width — and `body`'s `align-items: safe center` vertical
+      centering has no awareness of either dock's height, so with enough spare vertical room it
+      centered `.app` far enough down that `.cabinet__frame`'s bottom edge and `.audio-profiler`'s
+      top edge genuinely overlapped (~12px measured), not just a near-miss. Fixed with a
+      `@media (max-width: 600px)` rule adding `padding-bottom: 96px` to `body` — this shrinks the
+      box flexbox centers `.app` *within*, shifting the whole app up and out of the docks' reach,
+      cheaper and more robust than computing either dock's exact height/position from JS. Verified
+      clear at 375px (mobile) and 768px (tablet, above the breakpoint, relies on natural spacing
+      instead — also verified clear); 96px covers both docks' typical steady-state height (a
+      couple of active channels in the profiler) with margin, not their absolute worst case
+      (`.audio-profiler`'s `max-height: 260px` if many channels were active at once, which is
+      transient, not the steady state this was tuned against).
+
+    **If anything else ever gets added near a cabinet edge or corner, measure
+    `getBoundingClientRect()` against both fixed panels at multiple viewport sizes before
+    assuming it fits** — don't trust that "nothing overlapped before" means nothing will now.
 
 ---
 

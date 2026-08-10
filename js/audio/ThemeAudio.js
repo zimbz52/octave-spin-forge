@@ -268,6 +268,21 @@ class ThemeAudio {
   playBigWinIntro() {
     this._play("winBigT1");
   }
+
+  // --- Powerbet ---
+
+  // powerBetOn/powerBetOff don't exist in any theme bank yet (expected soon per
+  // product) — unlike playSymbolWin()'s Scatter fallback, there's no substitute sprite
+  // to fall back to here, so this just checks _spriteNames and no-ops quietly if
+  // missing rather than risking an undefined-sprite call into Howler. Safe to call
+  // freely; becomes live automatically the moment a bank actually defines these.
+  playPowerBetOn() {
+    if (this._spriteNames.has("powerBetOn")) this._play("powerBetOn");
+  }
+
+  playPowerBetOff() {
+    if (this._spriteNames.has("powerBetOff")) this._play("powerBetOff");
+  }
 }
 
 export const themeAudio = new ThemeAudio();

@@ -113,15 +113,25 @@ class SpinSequencer {
     return symbol;
   }
 
-  // Debug hook: arms a forced outcome for the very next spin only. Doesn't touch the
-  // underlying loss/small-win indices, so the deterministic cycle resumes exactly
-  // where it left off once the forced spin is consumed.
+  // Arms a forced blackout outcome for the very next spin only — the engine behind the
+  // Powerbet toggle (main.js). Doesn't touch the underlying loss/small-win indices, so
+  // the deterministic cycle resumes exactly where it left off once the forced spin is
+  // consumed.
   forceBigWinNext() {
     this.forcedOutcome = buildBlackoutOutcome(this._nextBigWinSymbol());
   }
 
   isForceArmed() {
     return this.forcedOutcome !== null;
+  }
+
+  // Cancels an armed-but-not-yet-consumed forced outcome — used when Powerbet is
+  // toggled back off before the next spin actually happens. Deliberately doesn't roll
+  // back _bigWinIndex (the symbol slot forceBigWinNext() already advanced past): same
+  // "arms on arm, not on consumption" accounting as clicking it twice in a row, just
+  // via a toggle instead of a debug button.
+  disarmForcedBigWin() {
+    this.forcedOutcome = null;
   }
 
   next() {
