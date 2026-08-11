@@ -21,16 +21,18 @@ export class BigWinWidget {
   }
 
   // Shows the widget immediately, starts the coin fountain, and rolls the massive
-  // counter from 0 to `amount` over `durationMs`. The fountain stops on its own once
-  // the roll-up finishes (not on dismiss) — the widget itself stays up until the
-  // player dismisses it, but the coins are tied to the count, not the collect action.
+  // counter from 0 to `amount` over `durationMs`. The fountain's emitter cuts off
+  // (stopSpawning, not stop) the instant the counter settles — see WinCounter's
+  // onClimaxSettle callback — but coins already in flight keep falling naturally
+  // ("gravity bleed") rather than being destroyed; the widget itself stays up until
+  // the player dismisses it, at which point _dismiss() below does clear them.
   show(amount, durationMs) {
     return new Promise((resolve) => {
       this._resolveDismiss = resolve;
       this.counter.reset();
       this.overlayEl.classList.add("big-win-overlay--active");
       this.fountain.start();
-      this.counter.rollUp(amount, durationMs, "big").then(() => this.fountain.stop());
+      this.counter.rollUp(amount, durationMs, "big", () => this.fountain.stopSpawning());
     });
   }
 

@@ -29,14 +29,26 @@ export class CoinFountain {
     this.intervalId = setInterval(spawnBurst, SPAWN_INTERVAL_MS);
   }
 
-  // Stops spawning and immediately clears every coin currently in flight.
+  // Stops spawning and immediately clears every coin currently in flight — an
+  // outright hard stop, used for dismissal (Collect / backdrop click), where the
+  // whole widget is going away and lingering coins shouldn't survive it.
   stop() {
+    this.stopSpawning();
+    this.activeCoins.forEach((coin) => coin.remove());
+    this.activeCoins.clear();
+  }
+
+  // Stops spawning NEW coins but leaves whatever's already in flight alone — their
+  // own fall animations (already running, see _spawnCoin()) carry them the rest of
+  // the way off the bottom of the screen and clean themselves up via anim.finished,
+  // same as always ("gravity bleed": no instant destroy). Used at the exact instant
+  // the win counter settles (see WinCounter.rollUp()'s onClimaxSettle), as opposed
+  // to stop() above.
+  stopSpawning() {
     if (this.intervalId !== null) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    this.activeCoins.forEach((coin) => coin.remove());
-    this.activeCoins.clear();
   }
 
   _spawnCoin() {

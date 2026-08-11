@@ -1222,6 +1222,37 @@ body {
   }
 }
 
+/* Big win only, one-shot: fires the instant the counter settles (WinCounter.rollUp()'s
+   onClimaxSettle, the same synchronous block that queues the busWinsBig outro
+   stinger) — a sharp punch distinct from win-counter-pulse-big's steady ambient
+   glow above (already stopped by the time this fires) and from --climax-scale
+   (the continuous grow-with-progress transform during the roll-up itself, reset to
+   1 at this same moment so this animation's own scale(1) end state is what's left
+   showing, not the roll-up's last grown value). forwards fill keeps the settled
+   gold/scale(1) end state applied until WinCounter.reset() removes the class for
+   the next win. */
+.win-counter__value--climax-pulse {
+  animation: win-counter-climax-pulse 250ms ease-out forwards;
+}
+
+@keyframes win-counter-climax-pulse {
+  0% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  40%, 60% {
+    transform: scale(1.2);
+    color: #ffffff;
+    text-shadow: 0 0 30px #ffffff, 0 0 60px #ffffff;
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  100% {
+    transform: scale(1);
+    color: var(--cabinet-accent);
+    text-shadow: 0 0 20px rgba(212, 175, 55, 0.9);
+  }
+}
+
 /* ---------- Big win overlay ---------- */
 
 .big-win-overlay {

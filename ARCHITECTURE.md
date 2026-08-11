@@ -6,7 +6,20 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 21
+Read this file first in any new session on this project. It reflects the state after Step 23
+(the Big Win counter's easing curve was reworked — a fast, non-decelerating climb through ~98% of
+the value, with a sharp brake confined to a short final slice, replacing a continuous ease-out
+that visibly dragged through the last several thousand points of a large win. Step 22's 550ms
+`CLIMAX_HOLD_MS.big` hold before the climax effects is also gone — they now all fire in the exact
+frame the target value is reached, zero setTimeout. See "Reworking the Big Win counter's pacing:
+aggressive climb, zero-latency climax (Step 23)" below — Step 22's own section is kept as
+historical record of the synchronization mechanism itself, which is unchanged, just no longer
+delayed). Before that: Step 22
+(the exact instant the Big Win counter settles now gets a synchronized 3-part payoff: a one-shot
+digit "punch" — scale to 1.2x, flash white, settle to gold at scale 1.0 — the coin fountain's
+emitter cutting off (existing coins keep falling naturally, not destroyed), and the `busWinsBig`
+outro stinger being queued, all from the exact same synchronous block in `WinCounter.rollUp()`.
+See "Synchronizing the Big Win counter's settle moment (Step 22)" below). Before that: Step 21
 (arcadeSounds.json was refreshed from the source, same as Egypt — this time with `mainMusic`
 instead of `musicMain` again, plus a new naming variant: `powerbetOn`/`powerbetOff`, lowercase
 "b", instead of `powerBetOn`/`powerBetOff`. Per the Step 19 policy, asked before touching
@@ -900,6 +913,141 @@ to sprites the code already expects, not new naming *patterns* to account for. V
 Arcade's music plays under `musicMain` (`mainMusic`/lowercase-`powerbet*` confirmed absent from
 `_spriteNames`), and a real Powerbet toggle on/off correctly played `powerBetOn` then
 `powerBetOff`.
+
+---
+
+## Synchronizing the Big Win counter's settle moment (Step 22)
+
+**Historical note (updated by Step 23 below):** the synchronization mechanism described in this
+section — everything firing from one call site — is still exactly how it works. What's *not*
+current anymore is the 550ms `CLIMAX_HOLD_MS.big` delay this section describes before that call
+site is reached: Step 23 removed it, so all three things below now fire in the same frame the
+counter hits its target, not 550ms later. Read this section for *what* fires together and *why*
+it's structured as one call site; read Step 23 for *when*.
+
+**What changed:** the exact instant `WinCounter.rollUp()`'s massive-counter roll-up settles (big
+wins only), three things now fire from one synchronous block instead of being only loosely
+related in time:
+
+1. **Digit punch** — a one-shot CSS animation on the counter digits: scale to 1.2x, flash pure
+   white, then settle to gold (`var(--cabinet-accent)`) at scale 1.0. New class
+   `.win-counter__value--climax-pulse` / `@keyframes win-counter-climax-pulse` in `styles.css`
+   (250ms, `ease-out forwards` — `forwards` fill keeps the settled gold/scale(1) end state applied
+   until the class is next removed). Per-keyframe `animation-timing-function` gives the up-swing a
+   springy overshoot and the down-swing a sharp "slam" rather than one uniform easing curve for
+   the whole thing. The 40%/60% keyframe pair holds the white flash for exactly 50ms of the 250ms
+   total.
+2. **Coin fountain emitter cutoff** — `CoinFountain.stopSpawning()` (new method) clears the spawn
+   interval only, leaving `activeCoins` and their already-running fall animations completely
+   alone. This is a genuinely new method, not a rename: the existing `stop()` (used only for
+   outright dismissal — Collect / backdrop click, in `BigWinWidget._dismiss()`) still does the old
+   "clear interval + immediately remove every coin" behavior, now implemented as
+   `stopSpawning()` + destroying `activeCoins`. Before this step, `BigWinWidget.show()` called the
+   destructive `stop()` on the roll-up's natural completion too (via `.then()` on the `rollUp()`
+   promise) — coins in flight were being deleted outright the moment the count finished, not left
+   to fall. Now `show()` passes `() => this.fountain.stopSpawning()` as `rollUp()`'s new 4th
+   argument instead.
+3. **`busWinsBig` outro stinger queued** — unchanged mechanism (`stopWinRollup("big")` →
+   `ThemeAudio.stopBigWinRiser()`, which registers `winBigRiserEnd` on the riser's own `"stop"`
+   event and calls `.stop()` — see "Powerbet" and the sprite-contract table above), just now
+   sharing the same call site as the two effects above instead of being the only thing that fired
+   there.
+
+**How the sync is actually enforced:** `rollUp(amount, durationMs, type, onClimaxSettle)` gained a
+4th parameter, called only for `isBig`. Inside the roll-up's existing `setTimeout` callback (the
+one that already called `stopWinRollup(type)` after `CLIMAX_HOLD_MS.big` — 550ms — of hold time
+past the counter visually hitting its target), the digit-punch class-add, the `--climax-scale`
+reset to `1` (so the pulse's own `scale(1)` end state is what persists, not the roll-up's last
+grown value, ~1.55), and `onClimaxSettle()` all run as the first statements in that callback,
+immediately followed by the pre-existing `stopWinRollup(type)` call. **Nothing async or
+promise-chained** — this is deliberately NOT "resolve the roll-up promise, then `.then()` the
+fountain stop," which is what the original code did and is exactly the kind of loose coupling
+this task asked to remove. `BigWinWidget.show()` no longer has any `.then()` on `rollUp()` at all
+for this purpose.
+
+**`WinCounter.reset()`** now also removes `win-counter__value--climax-pulse` (alongside its
+existing `--climax-scale` reset), so the pulse can cleanly re-trigger on a future big win — a
+CSS class add is a no-op if the class is already present, so cleanup has to happen somewhere, and
+`reset()` (already the canonical "clear all counter visual state" method, called at the start of
+every `show()` and on every dismiss) is the natural place, not an `animationend` listener (which
+would fire the same instant `forwards` fill starts holding the end state, immediately undoing it).
+
+**Verified live**, by wrapping `ThemeAudio.stopBigWinRiser` and `CoinFountain.prototype.stopSpawning`/
+`.stop` directly (not just observing effects) through a real forced Grand Win:
+- The digit-punch class-add and `stopBigWinRiser()` (which queues `winBigRiserEnd`) landed in the
+  same JS tick — a `MutationObserver` on the digits' `class` attribute logged the change only
+  ~0.2ms after the wrapped `stopBigWinRiser` call, and that gap is `MutationObserver`'s own
+  microtask delivery lag, not real execution order (the class-add statement runs *before*
+  `stopWinRollup()`/`stopBigWinRiser()` in source order, within one synchronous callback).
+- After settling: computed `color` was `rgb(212, 175, 55)` (exactly `--cabinet-accent`) and
+  computed `transform` was the scale(1) identity matrix — confirms the "slam back to 1.0x, gold"
+  end state actually holds, not just the keyframe declaring it.
+- `stopSpawning()` fired with **71 active coins** in flight at that exact moment, and — critically
+  — `stop()` was *not* called for this path, confirming those 71 coins were left alone rather than
+  destroyed. They finished falling and self-removed (via each coin's own pre-existing
+  `anim.finished` cleanup, unchanged) on their own over the following ~1.6-2.6s.
+- A real small win was checked afterward: the inline counter's value element never gained the
+  `--climax-pulse` class, confirming this entire step is scoped to big wins only, as designed —
+  `isBig` gates every part of it.
+
+---
+
+## Reworking the Big Win counter's pacing: aggressive climb, zero-latency climax (Step 23)
+
+**The complaint:** the counter was "decelerating too early (dragging between 24k and 25k)" — a
+symptom of the old easing curve (`1 - (1-t)^4`, a single continuous ease-out across the *entire*
+roll-up). A quartic ease-out reaches ~99%+ of its target well before t=1 and then spends a large
+remaining fraction of the total duration crawling through a small remaining fraction of the value
+— for a 25,000-point win that meant multiple seconds spent creeping through the last couple
+hundred points. Separately, Step 22's `CLIMAX_HOLD_MS.big` (550ms) meant the climax effects
+(digit punch, fountain cutoff, outro stinger) didn't fire until half a second *after* the counter
+visually stopped moving — a second, compounding kind of lag on top of the dragging itself.
+
+**1. Easing curve — `bigWinEasedProgress(t, amount)` (`WinCounter.js`), big wins only:**
+a two-phase curve, not one continuous formula:
+- **Climb phase** (first `1 - BIG_WIN_BRAKE_TIME_FRACTION` = 92% of the duration): **linear**,
+  not decelerating, up to `brakeStartProgress` — computed per-call as `1 - min(amount * 2%, 1000)
+  / amount`, i.e. value progress stops just short of a brake zone that's at most 2% of the target
+  *and* never more than 1000 points, whichever is smaller. For a 25,000 win that's the last 500
+  points (2%); for a hypothetical 100,000 win it'd cap at the last 1000 points (1%) rather than
+  scale up to 2%.
+- **Brake phase** (final `BIG_WIN_BRAKE_TIME_FRACTION` = 8% of the duration, currently 640ms of
+  an 8s roll-up): a steep `1 - (1-localT)^4` ease-out, but confined to this short window and
+  small value slice — reads as a sharp snap-to-stop rather than a long drift, since a high-power
+  ease-out is still fast through most of *its own* local range and only really decelerates right
+  at the very end of it.
+- The two phases meet at exactly `brakeStartProgress` at the boundary (`t = climbTimeEnd`) in
+  both formulas, so there's no visible jump at the phase transition — only a change in slope
+  (the "sharp brake" itself, which is the intended effect, not a bug).
+- Small-win easing (`1 - (1-t)^2`) is untouched — this task was scoped to the Big Win counter
+  only, per its own framing.
+
+**2. Zero-latency climax — no more `CLIMAX_HOLD_MS.big`.** The `isBig` branch of `rollUp()`'s
+finishing block no longer wraps anything in `setTimeout`: the instant `t` reaches 1 (the frame
+the target value is hit), `triggerWinClimax()`, the `--climax-scale` reset, the
+`win-counter__value--climax-pulse` class add, `onClimaxSettle()` (fountain `stopSpawning()`), and
+`stopWinRollup("big")` (which queues the `busWinsBig` outro via
+`ThemeAudio.stopBigWinRiser()`) all run as consecutive statements in that same frame — an early
+`return` after them skips the small-win-only `setTimeout` path entirely. `CLIMAX_HOLD_MS` now
+only has a `small` key; small wins still hold briefly (200ms) between their own climax cue and
+stop hook, unchanged — see "Synchronizing the Big Win counter's settle moment (Step 22)" above
+for why that separation is still useful for small wins specifically (it isn't for big wins, whose
+climax effects are meant to read as one instantaneous beat, not two).
+
+**Verified live**, sampling the displayed counter value every 100ms through a full real Grand Win
+(target 25,000) plus the same direct-instrumentation approach as Step 22:
+- The climb from ~20,256 to 24,792 (most of the pre-brake range) advanced at a **flat, linear
+  ~3,330/second** rate — no early deceleration, confirming the "aggressive, non-dragging climb"
+  fix.
+- The brake phase covered 24,792 → 25,000 (208 points) in **~408ms**, versus an estimate for the
+  old curve covering a comparable late range (24,798 → 25,000, ~202 points) in **~2,400ms** — the
+  old curve was already at 99.19% of target by 70% of elapsed time, then spent the remaining 30%
+  crawling the last <1%. Roughly a 6x reduction in how long the "final approach" visibly drags.
+- The digit-punch class-add and the wrapped `stopBigWinRiser()` call landed in the same JS tick
+  (the ~0.2ms gap between them is `MutationObserver`'s microtask delivery lag, same caveat as
+  Step 22) — confirming no `setTimeout` reintroduced a delay.
+- A real small win afterward rolled up normally (0 → 50) with no change in behavior, confirming
+  the small-win path is untouched.
 
 ---
 
