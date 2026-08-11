@@ -163,9 +163,8 @@ class ThemeAudio {
   _playMusicLoop() {
     // Strict singleton: never start a second overlapping music-loop instance.
     if (this.musicId !== null && this.howl.playing(this.musicId)) return;
-    const spriteName = this._musicSpriteName();
-    if (!spriteName) return; // bank defines no music track under either known name
-    this.musicId = this.howl.play(spriteName);
+    if (!this._spriteNames.has("musicMain")) return; // bank defines no music track
+    this.musicId = this.howl.play("musicMain");
     this.howl.loop(true, this.musicId);
     // Fades in from silence up to the fader's current target (0 if the player already
     // muted the music) rather than snapping straight there — musicMain now starts
@@ -173,16 +172,6 @@ class ThemeAudio {
     // overlap instead of both hitting full volume at once. Howler's fade() sets the
     // starting volume itself; no separate .volume(0, id) call needed first.
     this.howl.fade(0, this._musicTargetVolume(), MUSIC_FADE_IN_MS, this.musicId);
-  }
-
-  // Prefers the standard "musicMain" name; falls back to "mainMusic" for banks that
-  // used the words in the other order (first seen in chinaSounds.json) — same dynamic-
-  // fallback shape as playSymbolWin()'s Scatter/symbol04 handling below, not a JSON
-  // edit (provided configs are copied byte-for-byte, never renamed — see rule #4).
-  _musicSpriteName() {
-    if (this._spriteNames.has("musicMain")) return "musicMain";
-    if (this._spriteNames.has("mainMusic")) return "mainMusic";
-    return null;
   }
 
   // Sets only the music track's volume (0.0-1.0), leaving UI sounds and thematic SFX
@@ -209,7 +198,7 @@ class ThemeAudio {
   // theme — the actual number musicMain's Howler volume should be set to at any given
   // moment (fade-in target, live fader/mixer changes, post-duck restore).
   _musicTargetVolume() {
-    return this._scaledMusicVolume() * this._busGain(this._musicSpriteName() ?? "musicMain");
+    return this._scaledMusicVolume() * this._busGain("musicMain");
   }
 
   // Re-applies the current target volume to whatever's actually playing on musicId —
@@ -259,10 +248,13 @@ class ThemeAudio {
   // Picks a random sprite name matching "<prefix><NN>" from whatever the active bank
   // actually defines, rather than assuming every bank provides a fixed count (reelStart
   // 5, reelTurbo 5, winSmall 4, etc.) — chinaSounds.json only defines 3 reelStart/
-  // reelTurbo variants and 3 winSmall variants, fewer than every earlier bank, which is
-  // exactly the case this guards against: calling Howler with a sprite name the active
-  // bank never declared. Returns null (caller no-ops) if the bank defines none at all
-  // for this prefix.
+  // reelTurbo variants, fewer than every earlier bank, which is exactly the case this
+  // guards against: calling Howler with a sprite name the active bank never declared.
+  // Returns null (caller no-ops) if the bank defines none at all for this prefix.
+  //
+  // Naming mismatches (a prefix's words in the wrong order, etc.) are deliberately NOT
+  // handled here via a fallback prefix list — see "Reverting the naming fallbacks
+  // (Step 19)" in ARCHITECTURE.md. Fix the source JSON directly when that happens.
   _randomAvailableIndexedName(prefix) {
     const pattern = new RegExp(`^${prefix}\\d+$`);
     const matches = [...this._spriteNames].filter((name) => pattern.test(name));

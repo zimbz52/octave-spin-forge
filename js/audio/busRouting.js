@@ -7,9 +7,7 @@
 const BUS_RULES = [
   { bus: "busReelsTurbo", test: (name) => name.startsWith("reelTurbo") },
   { bus: "busReelsNormal", test: (name) => name.startsWith("reelStart") || name.startsWith("reelStop") },
-  // "mainMusic" (words reversed) first showed up in chinaSounds.json — same bus
-  // either way; see ThemeAudio._musicSpriteName() for the matching playback fallback.
-  { bus: "busMusic", test: (name) => name === "musicMain" || name === "mainMusic" },
+  { bus: "busMusic", test: (name) => name === "musicMain" },
   { bus: "busAtmosphere", test: (name) => name === "gameAmbLP" || name === "gameStart" },
   // winSmall01-04 (the flavor layer) and winSmallDigits/winSmallDigitsEnd (the counter
   // roll-up bed + its completion sting, see "Adding China" below) share this bus — both

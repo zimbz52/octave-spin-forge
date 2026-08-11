@@ -1,0 +1,156 @@
+"neondriveSounds": {
+  "src": "./assets/23/sounds/neondriveSounds.mp3",
+  "id": "neondriveSounds",
+  "sounds": [
+    {
+      "name": "gameAmbLP",
+      "start": 0,
+      "duration": 30
+    },
+    {
+      "name": "gameStart",
+      "start": 30,
+      "duration": 6.1
+    },
+    {
+      "name": "musicMain",
+      "start": 37,
+      "duration": 27.395
+    },
+    {
+      "name": "powerBetOff",
+      "start": 65,
+      "duration": 3.363
+    },
+    {
+      "name": "powerBetOn",
+      "start": 69,
+      "duration": 6
+    },
+    {
+      "name": "reelStart01",
+      "start": 75,
+      "duration": 1.087
+    },
+    {
+      "name": "reelStart02",
+      "start": 77,
+      "duration": 1.078
+    },
+    {
+      "name": "reelStart03",
+      "start": 79,
+      "duration": 1.025
+    },
+    {
+      "name": "reelStop01",
+      "start": 81,
+      "duration": 0.322
+    },
+    {
+      "name": "reelStop02",
+      "start": 82,
+      "duration": 0.35
+    },
+    {
+      "name": "reelStop03",
+      "start": 83,
+      "duration": 0.325
+    },
+    {
+      "name": "reelStop04",
+      "start": 84,
+      "duration": 0.34
+    },
+    {
+      "name": "reelStop05",
+      "start": 85,
+      "duration": 0.334
+    },
+    {
+      "name": "reelTurbo01",
+      "start": 86,
+      "duration": 0.52
+    },
+    {
+      "name": "reelTurbo02",
+      "start": 87,
+      "duration": 0.487
+    },
+    {
+      "name": "reelTurbo03",
+      "start": 88,
+      "duration": 0.518
+    },
+    {
+      "name": "reelTurbo04",
+      "start": 89,
+      "duration": 0.477
+    },
+    {
+      "name": "reelTurbo05",
+      "start": 90,
+      "duration": 0.523
+    },
+    {
+      "name": "winSmall01",
+      "start": 91,
+      "duration": 1.243
+    },
+    {
+      "name": "winSmall02",
+      "start": 93,
+      "duration": 1.402
+    },
+    {
+      "name": "winSmall03",
+      "start": 95,
+      "duration": 1.454
+    },
+    {
+      "name": "winSmall04",
+      "start": 97,
+      "duration": 1.342
+    },
+    {
+      "name": "winBigRiser",
+      "start": 99,
+      "duration": 24.039
+    },
+    {
+      "name": "winBigRiserEnd",
+      "start": 124,
+      "duration": 3.645
+    },
+    {
+      "name": "winBigT1",
+      "start": 128,
+      "duration": 2.568
+    },
+    {
+      "name": "winSymbol01",
+      "start": 131,
+      "duration": 1.61
+    },
+    {
+      "name": "winSymbol02",
+      "start": 133,
+      "duration": 1.426
+    },
+    {
+      "name": "winSymbol03",
+      "start": 135,
+      "duration": 1.17
+    },
+    {
+      "name": "winSymbol04",
+      "start": 137,
+      "duration": 2.353
+    },
+    {
+      "name": "winSymbolWild",
+      "start": 140,
+      "duration": 1.382
+    }
+  ]
+}

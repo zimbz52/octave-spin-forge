@@ -6,7 +6,21 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 17
+Read this file first in any new session on this project. It reflects the state after Step 19
+(the naming-fallback mechanisms built in Steps 17-18 — `_musicSpriteName()`'s musicMain/mainMusic
+fallback, and `_randomAvailableIndexedName()`'s priority-ordered-prefix-list form for
+winSmall/smallWin — were both **removed**, and the two JSON files that motivated them were
+corrected at the source instead (`neondriveSounds.json`'s `smallWin01-04` → `winSmall01-04`,
+mirroring the earlier `mainMusic` → `musicMain` fix in `chinaSounds.json`). **This is now the
+default going forward: when a bank's naming looks like a one-off authoring slip, fix it in the
+JSON — ask first if it's not clearly a mistake — rather than writing fallback code for it.** See
+"Reverting the naming fallbacks: fix JSON at the source instead (Step 19)" below; Steps 17-18's
+sections are kept as historical record of what was tried and why it changed, not as current
+behavior. Before that: Step 18
+(a 6th theme, Neon Drive, was added — its bank originally named the small-win flavor layer
+`smallWin01-04` instead of every earlier bank's `winSmall01-04`, the same "words swapped"
+mistake-shape as China's `mainMusic`/`musicMain` — see Step 19 above for how this was ultimately
+resolved). Before that: Step 17
 (a 5th theme, China, was added — the first bank to break two previously-unstated assumptions:
 fewer reel/win sprite variants than every earlier bank provided, and its music track named
 `mainMusic` instead of `musicMain`. Both are now handled generically rather than patched for
@@ -182,6 +196,7 @@ src/audio/                      Theme + system audio JSON configs (exact copies 
   arcadeSounds.json
   footballSounds.json
   chinaSounds.json
+  neondriveSounds.json
 
 assets/23/sounds/                Actual mp3 files. Path is dictated by each JSON's own "src"
                                   field (`./assets/23/sounds/<name>.mp3`), which is never edited
@@ -190,15 +205,15 @@ assets/23/sounds/                Actual mp3 files. Path is dictated by each JSON
                                   the JSON's own location).
 
 assets/bg_<name>.jpg             Real per-theme background photos (Step 9's bgImagePath target —
-                                  see "Theme switching / visual transition"). All 5 themes have
+                                  see "Theme switching / visual transition"). All 6 themes have
                                   one: bg_egypt.jpg, bg_mexico.jpg, bg_arcade.jpg, bg_football.jpg,
-                                  bg_china.jpg.
+                                  bg_china.jpg, bg_neondrive.jpg.
 
 themes/                         Per-theme *visual* config stubs (themeName, bgImagePath — real,
                                  see above — plus background/symbol asset paths that are still
                                  unused-but-wired scaffolding for future art; don't confuse the
                                  two, only bgImagePath is actually read by any code).
-  egypt.json, mexico.json, arcade.json, football.json, china.json
+  egypt.json, mexico.json, arcade.json, football.json, china.json, neondrive.json
 ```
 
 ---
@@ -593,7 +608,7 @@ Powerbet toggle sound existed to route, China's):
 |---|---|
 | `busReelsNormal` | `reelStart01-05`, `reelStop01-05` |
 | `busReelsTurbo` | `reelTurbo01-05` |
-| `busMusic` | `musicMain` (or `mainMusic`, see "Adding China" below) |
+| `busMusic` | `musicMain` |
 | `busAtmosphere` | `gameAmbLP`, `gameStart` |
 | `busWinsSmall` | `winSmall01-04`, `winSmallDigits`, `winSmallDigitsEnd` |
 | `busWinsSymbol` | `winSymbol01-04`, `winSymbolWild`, `winSymbolScatter` |
@@ -670,6 +685,12 @@ actual Howler gain was `0.9` (fader × `MUSIC_VOLUME_TRIM` only) — not `0.45`.
 
 ## Adding China: variant-count and music-name fallbacks (Step 17)
 
+**Historical note (superseded by Step 19 below):** point 2's `_musicSpriteName()` fallback was
+removed and `chinaSounds.json`'s `mainMusic` was corrected to `musicMain` at the source. Point 1's
+variant-count fix (`_randomAvailableIndexedName()`) is still current — that one's about *how many*
+variants exist, not a naming mismatch, so it was never in question. Kept below as-written for the
+reasoning trail; don't treat point 2's fallback as still active.
+
 **The "add a theme" pipeline (see "What's deliberately NOT implemented yet" below) held for
 China exactly as documented** — `themes/china.json`, `src/audio/chinaSounds.json` (copied
 byte-for-byte per rule #4), `assets/bg_china.jpg`, one `THEMES` entry, one `THEME_BACKDROPS`
@@ -737,6 +758,88 @@ the win climax. `busWinsBig` now covers only `winBigRiser`/`winBigRiserEnd`/`win
 
 ---
 
+## Adding Neon Drive: a second reordered-name case (Step 18)
+
+**Historical note (superseded by Step 19 below):** the fallback approach described in this whole
+section was reverted. `_randomAvailableIndexedName()` is back to single-prefix-only,
+`neondriveSounds.json`'s `smallWin01-04` was corrected to `winSmall01-04` at the source, and
+`playSmallWin()` no longer passes an array. Kept below as-written for the reasoning trail — it's
+*why* Step 19 landed the way it did — not as current behavior.
+
+**Same pipeline as every theme add, plus one more reordered-name mismatch** —
+`neondriveSounds.json` names its small-win flavor layer `smallWin01-04` instead of every earlier
+bank's `winSmall01-04` (egypt/mexico/arcade/football/china all agree on `winSmall`). Same
+mistake-shape as China's `mainMusic`/`musicMain` (Step 17), different sprite family.
+
+**Handled by generalizing the Step 17 fix rather than writing a second one-off fallback.**
+`_randomAvailableIndexedName(prefix)` became `_randomAvailableIndexedName(prefixOrPrefixes)`:
+still accepts a single prefix string (every existing call site — `reelStart`, `reelStop`,
+`reelTurbo` — is unchanged), but now also accepts a priority-ordered array. `playSmallWin()` is
+the one call site that uses the array form: `["winSmall", "smallWin"]` — tries `winSmall*` first,
+only falls through to `smallWin*` if the bank defines zero sprites matching the first prefix.
+`busRouting.js`'s `busWinsSmall` rule was widened the same way (`startsWith("winSmall") ||
+startsWith("smallWin")`), so bus-gain routing agrees with playback regardless of which name a
+given bank used. **This is deliberately the general mechanism for* any* future reordered-prefix
+case, not specific to `winSmall`/`smallWin`** — a third bank reordering some other prefix pair
+would extend the same way: pass an array to `_randomAvailableIndexedName()` at its one call site,
+widen the matching `busRouting.js` rule to match either spelling.
+
+**Verified both directions, same regression-check shape as Step 17:** spied on `howl.play()`
+across 100 calls on Neon Drive — `_randomAvailableIndexedName(["winSmall", "smallWin"])`
+consistently resolved to `smallWin01-04` (no `winSmall*` exists in this bank, so the fallback
+always engages) — and on Egypt, still consistently resolved to `winSmall01-04` (the primary
+prefix has matches, so the fallback is never even consulted). A real small-win spin on Neon Drive
+was also verified end-to-end: `smallWin01`/`winSymbol01` both fired correctly as the win layers.
+`musicMain` needed no fallback this time — Neon Drive's bank already uses the standard name.
+`powerBetOn`/`powerBetOff` again needed zero playback changes, same as China (Step 17) — picked
+up automatically by the existing `_spriteNames.has(...)` guard, routed to the now-separate
+`busPowerBet` bus with no further change.
+
+---
+
+## Reverting the naming fallbacks: fix JSON at the source instead (Step 19)
+
+**What changed:** both naming-fallback mechanisms built in Steps 17-18 were removed, and the two
+JSON files that motivated them were corrected directly instead — same treatment as the original
+`mainMusic` → `musicMain` correction from Step 17, just applied consistently now rather than
+building code around the second occurrence.
+
+- `_musicSpriteName()` (Step 17) is gone. `_playMusicLoop()` and `_musicTargetVolume()` go back to
+  a hardcoded `"musicMain"` literal, guarded by `_spriteNames.has("musicMain")`.
+- `_randomAvailableIndexedName()` (Step 18) is back to taking a single prefix string, not a
+  priority-ordered array. `playSmallWin()` calls it with just `"winSmall"`.
+- `busRouting.js`'s `busMusic` and `busWinsSmall` rules dropped their `mainMusic`/`smallWin`
+  alternate-name matches — back to exact/single-prefix matches only.
+- `neondriveSounds.json`'s `smallWin01-04` was renamed to `winSmall01-04`, in both this project's
+  copy and the original file in the Drive sync folder — the same two-location fix already applied
+  to `chinaSounds.json`'s `mainMusic` in Step 17.
+
+**Why:** explicit direction after Neon Drive's `smallWin`/`winSmall` mismatch turned out to be the
+same category of thing as China's `mainMusic`/`musicMain` — a one-off authoring slip, not an
+intentional per-theme convention worth a permanent code branch for. Building fallback logic for
+each new naming variant, as Steps 17-18 did, has two real costs: it grows `ThemeAudio.js`'s surface
+area indefinitely (a new fallback for every future slip, forever), and it silently papers over a
+data-quality problem that's cheaper to fix once at the source than to keep defending against in
+code. Fixing the JSON directly keeps `ThemeAudio.js`'s contract simple — *every* bank uses the
+standard sprite names, full stop — and surfaces naming inconsistencies where they can actually be
+prevented (the audio-authoring pipeline), not just individually patched around forever.
+
+**The rule going forward, stated explicitly:** when a new theme bank's sprite naming looks like a
+slight, likely-unintentional variation on the established convention (words reordered, a typo,
+etc.), **ask whether to correct it in the source JSON before writing any fallback/dynamic-matching
+logic for it.** Don't default to defensive code the way Steps 17-18 did. This doesn't apply to
+things that are genuinely optional-by-design (`winSmallDigits`, `powerBetOn/Off` not existing in
+every bank, the `winSymbolScatter`/`winSymbol04` legacy rename) — those are real per-bank
+differences the code is meant to tolerate, not naming mistakes to correct.
+
+**Verified after reverting:** Neon Drive's small win still plays correctly (`winSmall02` fired on
+a live small-win spin, via the plain non-fallback path this time), `busRouting.js` confirmed
+`getBusForSprite("smallWin01")` and `getBusForSprite("mainMusic")` both now return `null` (neither
+name is routed, matching that no bank uses them anymore), and Egypt/China both regression-checked
+clean.
+
+---
+
 ## Theme switching / visual transition
 
 Both `ThemeTransition.swapTo(themeName)` (in-game dropdown) and `enterFromTerminal(themeName,
@@ -768,12 +871,13 @@ art existed (still there, still unused; `bgImagePath` is the field that's actual
   center; background-repeat: no-repeat;` unconditionally — harmless no-ops against a CSS gradient,
   and exactly what auto-crops/centers a real photo of any aspect ratio to fill the container with
   zero manual editing per theme.
-- **All 5 themes now have a real image file on disk at their `bgImagePath`** (`assets/bg_egypt.jpg`,
-  `bg_mexico.jpg`, `bg_arcade.jpg`, `bg_football.jpg`, `bg_china.jpg` — top-level `assets/`, not
-  `assets/themes/<name>/`), so the gradient fallback in normal play is currently dead-but-ready
-  code, only exercised if a file goes missing or fails to decode. Adding a 6th theme with no image
-  yet is fine and expected to work (falls through cleanly) — just don't mistake "gradient showing"
-  for "the feature is broken," check the file actually exists at the exact path first.
+- **All 6 themes now have a real image file on disk at their `bgImagePath`** (`assets/bg_egypt.jpg`,
+  `bg_mexico.jpg`, `bg_arcade.jpg`, `bg_football.jpg`, `bg_china.jpg`, `bg_neondrive.jpg` —
+  top-level `assets/`, not `assets/themes/<name>/`), so the gradient fallback in normal play is
+  currently dead-but-ready code, only exercised if a file goes missing or fails to decode. Adding
+  a 7th theme with no image yet is fine and expected to work (falls through cleanly) — just don't
+  mistake "gradient showing" for "the feature is broken," check the file actually exists at the
+  exact path first.
 
 **There is no "medieval" theme anymore** — it was removed (it was always a placeholder with no
 audio asset ever provided). Themes now come from `themeRegistry.js`'s `THEMES` array, which both
@@ -1233,18 +1337,18 @@ floating dock). **The floating dock was chosen.** What that means concretely:
   `playTransitionWhoosh` (no whoosh sprite exists in `systemSounds.json` yet). Check
   `audioHooks.js` directly for the current authoritative list — it changes as more sound design
   lands.
-- 5 themes exist (Egypt, Mexico, Vintage Arcade — `id: "arcade"` — Football, and China). The
-  system generalizes cleanly to dozens more: drop a new `<theme>Sounds.json`/`.mp3` at the
-  established paths, add a `themes/<name>.json` stub, add one `{ id, label }` entry to `THEMES` in
-  `themeRegistry.js` (this alone updates both the startup terminal's list and the in-game
-  dropdown), and add a `THEME_BACKDROPS[themeName]` gradient in `ThemeTransition.js` (falls back
-  to the default dark gradient if omitted). Football (added post-Step-10) is the cleanest proof of
-  the *no-code-change* case: zero code beyond the registry entry and the fallback gradient. China
-  (Step 17) needed real code changes, but only because its bank broke two previously-unstated
-  assumptions (fewer indexed sprite variants than every earlier bank, `mainMusic` instead of
-  `musicMain`) — both fixes are generic, not China-specific, so a 7th theme repeating either
-  should now need zero code changes too. See "Adding China: variant-count and music-name
-  fallbacks (Step 17)" above.
+- 6 themes exist (Egypt, Mexico, Vintage Arcade — `id: "arcade"` — Football, China, and Neon
+  Drive). The system generalizes cleanly to dozens more: drop a new `<theme>Sounds.json`/`.mp3` at
+  the established paths, add a `themes/<name>.json` stub, add one `{ id, label }` entry to
+  `THEMES` in `themeRegistry.js` (this alone updates both the startup terminal's list and the
+  in-game dropdown), and add a `THEME_BACKDROPS[themeName]` gradient in `ThemeTransition.js`
+  (falls back to the default dark gradient if omitted). Football (added post-Step-10) is the
+  cleanest proof of the *no-code-change* case: zero code beyond the registry entry and the
+  fallback gradient. China (Step 17) and Neon Drive (Step 18) both needed real code changes, but
+  only because their banks broke previously-unstated naming/count assumptions (fewer indexed
+  sprite variants, `mainMusic`/`musicMain` and `winSmall`/`smallWin` reordering) — every fix is
+  generic, not theme-specific, so a 7th theme repeating any of them should now need zero code
+  changes. See "Adding China" (Step 17) and "Adding Neon Drive" (Step 18) above.
 - The win-line dash (small win) is a single horizontal line; a big win's 9-tile blackout has no
   equivalent multi-line dash effect (explicitly deferred — see comment in `GameController.js`).
 

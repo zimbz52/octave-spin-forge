@@ -1,0 +1,20 @@
+{
+  "themeName": "Neon Drive",
+  "bgImagePath": "assets/bg_neondrive.jpg",
+  "background": {
+    "id": "neondrive_bg",
+    "asset": "assets/themes/neondrive/background.jpg"
+  },
+  "symbols": {
+    "symbol01": "assets/themes/neondrive/symbol01.png",
+    "symbol02": "assets/themes/neondrive/symbol02.png",
+    "symbol03": "assets/themes/neondrive/symbol03.png",
+    "wild": "assets/themes/neondrive/wild.png",
+    "scatter": "assets/themes/neondrive/scatter.png"
+  },
+  "audio": {
+    "intro": "assets/audio/neondrive/intro.mp3",
+    "outro": "assets/audio/neondrive/outro.mp3",
+    "backgroundLoop": "assets/audio/neondrive/bg_loop.mp3"
+  }
+}

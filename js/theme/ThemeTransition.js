@@ -13,6 +13,7 @@ const THEME_BACKDROPS = {
   arcade: "radial-gradient(circle at 30% 15%, #241a4a 0%, #0a0620 70%)",
   football: "radial-gradient(circle at 30% 15%, #1a4a2e 0%, #061a10 70%)",
   china: "radial-gradient(circle at 30% 15%, #6a1418 0%, #1c0506 70%)",
+  neondrive: "radial-gradient(circle at 30% 15%, #3a0a4a 0%, #0a0620 70%)",
 };
 
 function gradientBackdropFor(themeName) {

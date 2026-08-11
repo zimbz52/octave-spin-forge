@@ -9,4 +9,5 @@ export const THEMES = [
   { id: "arcade", label: "Vintage Arcade" },
   { id: "football", label: "Football" },
   { id: "china", label: "China" },
+  { id: "neondrive", label: "Neon Drive" },
 ];
