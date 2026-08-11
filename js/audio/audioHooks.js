@@ -76,6 +76,7 @@ export function playSymbolPulse() {
 export function startWinRollup(type) {
   console.log(`[audio hook] startWinRollup(type="${type}")`);
   if (type === "big") themeAudio.playBigWinRiser();
+  if (type === "small") themeAudio.playSmallWinDigits();
 }
 
 // type: "small" or "big". Fires the instant the counter hits its final amount — the
@@ -91,6 +92,7 @@ export function triggerWinClimax(type) {
 export function stopWinRollup(type) {
   console.log(`[audio hook] stopWinRollup(type="${type}")`);
   if (type === "big") themeAudio.stopBigWinRiser();
+  if (type === "small") themeAudio.stopSmallWinDigits();
 }
 
 // Fires the exact moment the big win overlay screen appears — a one-shot stinger

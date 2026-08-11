@@ -7,23 +7,24 @@ import { BUS_NAMES } from "./busRouting.js";
 // to produce an updated version of this same object.
 const DEFAULT_THEME_MIXES = {
   egypt: {
-    busMusic: 0.5,
+    busMusic: 0.8,
   },
   football: {
     busMusic: 0.75,
     busReelsTurbo: 0.99,
     busWinsSmall: 0.9,
     busWinsSymbol: 0.87,
-    // Clamped down from an originally-exported 1.3 — Howler's own volume() setter
-    // silently ignores any value outside 0-1 (no error, the sound just keeps whatever
-    // gain it already had), so a bus multiplier above 1 never actually did anything.
-    // 1 (100%) is the real ceiling; see setBusVolume() below, which now enforces it.
     busWinsBig: 1,
   },
   arcade: {
     busReelsTurbo: 0.9,
     busReelsNormal: 0.9,
     busWinsBig: 0.9,
+  },
+  china: {
+    busMusic: 0.5,
+    busReelsNormal: 0.7,
+    busPowerBet: 0.6,
   },
 };
 

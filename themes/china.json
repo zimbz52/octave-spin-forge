@@ -1,0 +1,20 @@
+{
+  "themeName": "China",
+  "bgImagePath": "assets/bg_china.jpg",
+  "background": {
+    "id": "china_bg",
+    "asset": "assets/themes/china/background.jpg"
+  },
+  "symbols": {
+    "symbol01": "assets/themes/china/symbol01.png",
+    "symbol02": "assets/themes/china/symbol02.png",
+    "symbol03": "assets/themes/china/symbol03.png",
+    "wild": "assets/themes/china/wild.png",
+    "scatter": "assets/themes/china/scatter.png"
+  },
+  "audio": {
+    "intro": "assets/audio/china/intro.mp3",
+    "outro": "assets/audio/china/outro.mp3",
+    "backgroundLoop": "assets/audio/china/bg_loop.mp3"
+  }
+}

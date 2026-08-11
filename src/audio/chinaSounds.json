@@ -1,0 +1,151 @@
+"chinaSounds": {
+  "src": "./assets/23/sounds/chinaSounds.mp3",
+  "id": "chinaSounds",
+  "sounds": [
+    {
+      "name": "gameAmbLP",
+      "start": 0,
+      "duration": 14.351
+    },
+    {
+      "name": "gameStart",
+      "start": 15,
+      "duration": 3.966
+    },
+    {
+      "name": "musicMain",
+      "start": 19,
+      "duration": 16
+    },
+    {
+      "name": "powerBetOff",
+      "start": 35,
+      "duration": 2.184
+    },
+    {
+      "name": "powerBetOn",
+      "start": 38,
+      "duration": 2.109
+    },
+    {
+      "name": "reelStart01",
+      "start": 41,
+      "duration": 1.451
+    },
+    {
+      "name": "reelStart02",
+      "start": 43,
+      "duration": 1.505
+    },
+    {
+      "name": "reelStart03",
+      "start": 45,
+      "duration": 1.387
+    },
+    {
+      "name": "reelStop01",
+      "start": 47,
+      "duration": 0.296
+    },
+    {
+      "name": "reelStop02",
+      "start": 48,
+      "duration": 0.297
+    },
+    {
+      "name": "reelStop03",
+      "start": 49,
+      "duration": 0.296
+    },
+    {
+      "name": "reelStop04",
+      "start": 50,
+      "duration": 0.29
+    },
+    {
+      "name": "reelStop05",
+      "start": 51,
+      "duration": 0.293
+    },
+    {
+      "name": "reelTurbo01",
+      "start": 52,
+      "duration": 0.412
+    },
+    {
+      "name": "reelTurbo02",
+      "start": 53,
+      "duration": 0.424
+    },
+    {
+      "name": "reelTurbo03",
+      "start": 54,
+      "duration": 0.436
+    },
+    {
+      "name": "winBigRiser",
+      "start": 55,
+      "duration": 17.973
+    },
+    {
+      "name": "winBigRiserEnd",
+      "start": 73,
+      "duration": 2.666
+    },
+    {
+      "name": "winBigT1",
+      "start": 76,
+      "duration": 2.428
+    },
+    {
+      "name": "winSmall01",
+      "start": 79,
+      "duration": 1.384
+    },
+    {
+      "name": "winSmall02",
+      "start": 81,
+      "duration": 1.526
+    },
+    {
+      "name": "winSmall03",
+      "start": 83,
+      "duration": 1.554
+    },
+    {
+      "name": "winSmallDigits",
+      "start": 85,
+      "duration": 5.038
+    },
+    {
+      "name": "winSmallDigitsEnd",
+      "start": 91,
+      "duration": 0.447
+    },
+    {
+      "name": "winSymbol01",
+      "start": 92,
+      "duration": 1.214
+    },
+    {
+      "name": "winSymbol02",
+      "start": 94,
+      "duration": 1.311
+    },
+    {
+      "name": "winSymbol03",
+      "start": 96,
+      "duration": 0.91
+    },
+    {
+      "name": "winSymbol04",
+      "start": 97,
+      "duration": 2.329
+    },
+    {
+      "name": "winSymbolWild",
+      "start": 100,
+      "duration": 2.566
+    }
+  ]
+}

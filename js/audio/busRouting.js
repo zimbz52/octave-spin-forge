@@ -7,15 +7,23 @@
 const BUS_RULES = [
   { bus: "busReelsTurbo", test: (name) => name.startsWith("reelTurbo") },
   { bus: "busReelsNormal", test: (name) => name.startsWith("reelStart") || name.startsWith("reelStop") },
-  { bus: "busMusic", test: (name) => name === "musicMain" },
+  // "mainMusic" (words reversed) first showed up in chinaSounds.json — same bus
+  // either way; see ThemeAudio._musicSpriteName() for the matching playback fallback.
+  { bus: "busMusic", test: (name) => name === "musicMain" || name === "mainMusic" },
   { bus: "busAtmosphere", test: (name) => name === "gameAmbLP" || name === "gameStart" },
+  // winSmall01-04 (the flavor layer) and winSmallDigits/winSmallDigitsEnd (the counter
+  // roll-up bed + its completion sting, see "Adding China" below) share this bus — both
+  // are "small win" audio, just different roles within it.
   { bus: "busWinsSmall", test: (name) => name.startsWith("winSmall") },
   // winSymbol01-04/winSymbolWild/winSymbolScatter (the symbol04 legacy fallback, see
   // ThemeAudio.playSymbolWin) all share this one bus — same "symbol-specific win" role.
   { bus: "busWinsSymbol", test: (name) => name.startsWith("winSymbol") },
-  // winBigRiser/winBigRiserEnd/winBigT1 plus powerBetOn/powerBetOff — everything tied
-  // to the Grand Win / Powerbet climax shares one bus.
-  { bus: "busWinsBig", test: (name) => name.startsWith("winBig") || name.startsWith("powerBet") },
+  // winBigRiser/winBigRiserEnd/winBigT1 — the Grand Win climax only, now that Powerbet
+  // has its own dedicated bus below rather than sharing this one.
+  { bus: "busWinsBig", test: (name) => name.startsWith("winBig") },
+  // powerBetOn/powerBetOff split out from busWinsBig into their own bus — the toggle's
+  // on/off cue is a distinct, player-facing control sound, not part of the win climax.
+  { bus: "busPowerBet", test: (name) => name.startsWith("powerBet") },
 ];
 
 export const BUS_NAMES = BUS_RULES.map((rule) => rule.bus);

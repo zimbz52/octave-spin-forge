@@ -6,9 +6,16 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 16
+Read this file first in any new session on this project. It reflects the state after Step 17
+(a 5th theme, China, was added — the first bank to break two previously-unstated assumptions:
+fewer reel/win sprite variants than every earlier bank provided, and its music track named
+`mainMusic` instead of `musicMain`. Both are now handled generically rather than patched for
+China specifically — see "Adding China: variant-count and music-name fallbacks (Step 17)"
+below — plus a new `winSmallDigits`/`winSmallDigitsEnd` pair wired to the small-win counter's
+roll-up start/end, the small-win equivalent of the big win riser/riserEnd pattern). Before that:
+Step 16
 (a hidden developer tool — triple-click the Signal Monitor's header to reveal a per-theme
-bus-gain mixing console, with sliders for 7 buses covering every sprite in the game and an
+bus-gain mixing console, with sliders for every bus covering every sprite in the game and an
 Export Config button that stringifies the adjusted multipliers to the clipboard; see "Dev mixer
 & bus routing (Step 16)" below). Before that: Step 15
 (the standalone `.topbar` panel is gone entirely — the "OCTAVE SPIN FORGE" title moved into
@@ -174,6 +181,7 @@ src/audio/                      Theme + system audio JSON configs (exact copies 
   mexicoSounds.json
   arcadeSounds.json
   footballSounds.json
+  chinaSounds.json
 
 assets/23/sounds/                Actual mp3 files. Path is dictated by each JSON's own "src"
                                   field (`./assets/23/sounds/<name>.mp3`), which is never edited
@@ -182,14 +190,15 @@ assets/23/sounds/                Actual mp3 files. Path is dictated by each JSON
                                   the JSON's own location).
 
 assets/bg_<name>.jpg             Real per-theme background photos (Step 9's bgImagePath target —
-                                  see "Theme switching / visual transition"). All 4 themes have
-                                  one: bg_egypt.jpg, bg_mexico.jpg, bg_arcade.jpg, bg_football.jpg.
+                                  see "Theme switching / visual transition"). All 5 themes have
+                                  one: bg_egypt.jpg, bg_mexico.jpg, bg_arcade.jpg, bg_football.jpg,
+                                  bg_china.jpg.
 
 themes/                         Per-theme *visual* config stubs (themeName, bgImagePath — real,
                                  see above — plus background/symbol asset paths that are still
                                  unused-but-wired scaffolding for future art; don't confuse the
                                  two, only bgImagePath is actually read by any code).
-  egypt.json, mexico.json, arcade.json, football.json
+  egypt.json, mexico.json, arcade.json, football.json, china.json
 ```
 
 ---
@@ -390,7 +399,10 @@ theme sprite bank provided so far (`egyptSounds.json`, `mexicoSounds.json`, `arc
 future theme bank ships with a real `winSymbol04` sprite, it'll be picked up automatically and
 the fallback simply won't trigger for that theme** — no code change needed either way, this is
 exactly the kind of thing the dynamic check exists to handle. Don't "clean up" the fallback
-assuming all banks have been migrated without actually checking `_spriteNames` first.
+assuming all banks have been migrated without actually checking `_spriteNames` first. **This
+already happened once:** `chinaSounds.json` (Step 17) is the first bank to define `winSymbol04`
+directly — it never touches the `winSymbolScatter` fallback path, no code change was needed to
+support it.
 
 ---
 
@@ -574,20 +586,22 @@ project once mixing is finalized. Not a player-facing feature — no button, lab
 in the visible UI points to it.
 
 **Bus routing (`busRouting.js`):** every sprite name in the game maps, by prefix, to exactly one
-of 7 buses:
+of 8 buses (was 7 — `busPowerBet` split out from `busWinsBig` per explicit request once a real
+Powerbet toggle sound existed to route, China's):
 
 | Bus | Sprites |
 |---|---|
 | `busReelsNormal` | `reelStart01-05`, `reelStop01-05` |
 | `busReelsTurbo` | `reelTurbo01-05` |
-| `busMusic` | `musicMain` |
+| `busMusic` | `musicMain` (or `mainMusic`, see "Adding China" below) |
 | `busAtmosphere` | `gameAmbLP`, `gameStart` |
-| `busWinsSmall` | `winSmall01-04` |
+| `busWinsSmall` | `winSmall01-04`, `winSmallDigits`, `winSmallDigitsEnd` |
 | `busWinsSymbol` | `winSymbol01-04`, `winSymbolWild`, `winSymbolScatter` |
-| `busWinsBig` | `winBigRiser`, `winBigRiserEnd`, `winBigT1`, `powerBetOn`, `powerBetOff` |
+| `busWinsBig` | `winBigRiser`, `winBigRiserEnd`, `winBigT1` |
+| `busPowerBet` | `powerBetOn`, `powerBetOff` |
 
 `getBusForSprite(name)` does the prefix match; `BUS_NAMES` is the canonical ordered list both
-`ThemeAudio` and `DevMixerPanel` read from — adding an 8th bus is a one-rule addition to
+`ThemeAudio` and `DevMixerPanel` read from — adding a 9th bus is a one-rule addition to
 `BUS_RULES`, nothing else needs to change.
 
 **State (`DevMixer.js`):** `themeMixes` is a plain in-memory object, `{ <themeId>: { <busName>:
@@ -654,6 +668,75 @@ actual Howler gain was `0.9` (fader × `MUSIC_VOLUME_TRIM` only) — not `0.45`.
 
 ---
 
+## Adding China: variant-count and music-name fallbacks (Step 17)
+
+**The "add a theme" pipeline (see "What's deliberately NOT implemented yet" below) held for
+China exactly as documented** — `themes/china.json`, `src/audio/chinaSounds.json` (copied
+byte-for-byte per rule #4), `assets/bg_china.jpg`, one `THEMES` entry, one `THEME_BACKDROPS`
+gradient — **but `chinaSounds.json` also exposed two assumptions every earlier bank happened to
+satisfy without anyone stating them as requirements.** Both are now handled generically (not
+patched for "china" specifically), since a 6th theme is just as likely to repeat either.
+
+**1. Fewer indexed sprite variants than every earlier bank.** egypt/mexico/arcade/football all
+provide exactly 5 `reelStart`, 5 `reelStop`, 5 `reelTurbo`, and 4 `winSmall` variants — nowhere
+written down as a rule, just true of every bank so far, and `ThemeAudio.js` used to hardcode
+those counts directly (`randomIndexedName(prefix, count)`, picking a random index 1..count with
+no check the sprite actually existed). `chinaSounds.json` only defines 3 `reelStart`, 3
+`reelTurbo`, and 3 `winSmall` variants (still the full 5 `reelStop`) — a random pick against the
+old hardcoded counts would, for China, sometimes call Howler with a sprite name (`reelStart04`,
+`winSmall04`, ...) the active bank never declared. Fixed by replacing the hardcoded-count
+function with `_randomAvailableIndexedName(prefix)`, which filters `this._spriteNames` for
+`^<prefix>\d+$` and picks among only what's actually there — `playReelStart/Stop/Turbo` and
+`playSmallWin` all switched to it. Verified both directions: spied on `howl.play()` across 200
+calls each on China (only ever saw `01`-`03`) and on Egypt (still the full `01`-`05`/`01`-`04`,
+confirming no regression for banks with the "normal" counts).
+
+**2. `mainMusic` instead of `musicMain` (originally).** `chinaSounds.json` as first provided named
+its main loop sprite `mainMusic` (words reversed) instead of every earlier bank's `musicMain`.
+`_playMusicLoop()` used to hardcode `"musicMain"` directly, so this would have silently played no
+music at all for China. Fixed generically first — `_musicSpriteName()` prefers `musicMain`, falls
+back to `mainMusic`, returns `null` (no music) if a bank defines neither, same dynamic-fallback
+shape as `playSymbolWin()`'s Scatter/symbol04 handling above — and `busRouting.js`'s `busMusic`
+rule was widened to match either name too. Verified live at the time: China's Signal Monitor
+showed the loop playing under the `mainMusic` label, at the correct combined gain.
+**Confirmed as a one-off authoring mistake, not an intentional variant, and corrected directly at
+the source** — both `src/audio/chinaSounds.json` (this project's byte-for-byte copy, normally
+never hand-edited per rule #4) and the original file in the Drive sync folder now say
+`musicMain`, so China no longer exercises the `mainMusic` fallback branch at all. **The fallback
+code itself was deliberately left in place, not reverted** — it's zero-cost when unused and
+exists specifically so the same mistake in some future bank is handled automatically rather than
+needing this same investigation again.
+
+**3. `winSmallDigits` / `winSmallDigitsEnd` — a new sprite pair, generalized immediately rather
+than special-cased.** China is the first bank to define these: `winSmallDigits` is meant to run
+under the small-win counter's roll-up (`WinCounter.rollUp()`), `winSmallDigitsEnd` is a one-shot
+completion sting the instant the roll-up settles. Wired as the small-win mirror of the existing
+big-win riser/riserEnd pattern, at the exact same chokepoints (`audioHooks.js`'s
+`startWinRollup(type)`/`stopWinRollup(type)`, which `WinCounter.rollUp()` already called for
+`type === "big"`): `type === "small"` now calls `themeAudio.playSmallWinDigits()` /
+`.stopSmallWinDigits()` too. `playSmallWinDigits()` loops the sprite (guarded by
+`_spriteNames.has("winSmallDigits")`, same shape as the Powerbet guards below — no-ops quietly on
+every bank that doesn't define it yet); `stopSmallWinDigits()` stops it and fires
+`winSmallDigitsEnd` from the stopped sound's own `"stop"` callback (guarded the same way),
+mirroring exactly how `stopBigWinRiser()` chains into `winBigRiserEnd`. Both route through
+`busWinsSmall` automatically — no `busRouting.js` change needed, since the existing `winSmall`
+prefix rule already covers them. Verified live: spied on `howl.play()` through a real small win —
+`winSmall03`/`winSymbol01` (the existing win layers) fired first, then `winSmallDigits` started,
+then `winSmallDigitsEnd` fired exactly when the counter's roll-up settled.
+
+**4. Powerbet playback needed zero changes; its bus did.** China is also the first bank to define
+`powerBetOn`/`powerBetOff` — `ThemeAudio.playPowerBetOn/Off()` already guarded on
+`_spriteNames.has(...)` specifically so playback would become live automatically the moment any
+bank defined them (see "Powerbet (Step 13)" above). Verified live: toggling Powerbet on then off
+on China correctly played `powerBetOn` then `powerBetOff` with no code touched. **Its dev-mixer
+bus was a separate story:** `powerBetOn`/`powerBetOff` originally shared `busWinsBig` with the
+Grand Win climax sprites (nothing to route before China, so it was an arbitrary choice at the
+time) — split into its own `busPowerBet` once real Powerbet audio existed to actually route,
+since the toggle's on/off cue is conceptually a distinct player-facing control sound, not part of
+the win climax. `busWinsBig` now covers only `winBigRiser`/`winBigRiserEnd`/`winBigT1`.
+
+---
+
 ## Theme switching / visual transition
 
 Both `ThemeTransition.swapTo(themeName)` (in-game dropdown) and `enterFromTerminal(themeName,
@@ -685,10 +768,10 @@ art existed (still there, still unused; `bgImagePath` is the field that's actual
   center; background-repeat: no-repeat;` unconditionally — harmless no-ops against a CSS gradient,
   and exactly what auto-crops/centers a real photo of any aspect ratio to fill the container with
   zero manual editing per theme.
-- **All 4 themes now have a real image file on disk at their `bgImagePath`** (`assets/bg_egypt.jpg`,
-  `bg_mexico.jpg`, `bg_arcade.jpg`, `bg_football.jpg` — top-level `assets/`, not
+- **All 5 themes now have a real image file on disk at their `bgImagePath`** (`assets/bg_egypt.jpg`,
+  `bg_mexico.jpg`, `bg_arcade.jpg`, `bg_football.jpg`, `bg_china.jpg` — top-level `assets/`, not
   `assets/themes/<name>/`), so the gradient fallback in normal play is currently dead-but-ready
-  code, only exercised if a file goes missing or fails to decode. Adding a 5th theme with no image
+  code, only exercised if a file goes missing or fails to decode. Adding a 6th theme with no image
   yet is fine and expected to work (falls through cleanly) — just don't mistake "gradient showing"
   for "the feature is broken," check the file actually exists at the exact path first.
 
@@ -1150,15 +1233,18 @@ floating dock). **The floating dock was chosen.** What that means concretely:
   `playTransitionWhoosh` (no whoosh sprite exists in `systemSounds.json` yet). Check
   `audioHooks.js` directly for the current authoritative list — it changes as more sound design
   lands.
-- 4 themes exist (Egypt, Mexico, Vintage Arcade — `id: "arcade"` — and Football). The system
-  generalizes cleanly to dozens more: drop a new `<theme>Sounds.json`/`.mp3` at the established
-  paths, add a `themes/<name>.json` stub, add one `{ id, label }` entry to `THEMES` in
+- 5 themes exist (Egypt, Mexico, Vintage Arcade — `id: "arcade"` — Football, and China). The
+  system generalizes cleanly to dozens more: drop a new `<theme>Sounds.json`/`.mp3` at the
+  established paths, add a `themes/<name>.json` stub, add one `{ id, label }` entry to `THEMES` in
   `themeRegistry.js` (this alone updates both the startup terminal's list and the in-game
   dropdown), and add a `THEME_BACKDROPS[themeName]` gradient in `ThemeTransition.js` (falls back
-  to the default dark gradient if omitted). No other code changes needed — `ThemeAudio` is fully
-  generic and just reads whatever sprites the new bank declares. Football (added post-Step-10) is
-  the cleanest real-world proof of this: zero code changes beyond the registry entry and the
-  fallback gradient — same `_startThemeIntro()`/`measure()`/`refreshLayout()` etc. all just worked.
+  to the default dark gradient if omitted). Football (added post-Step-10) is the cleanest proof of
+  the *no-code-change* case: zero code beyond the registry entry and the fallback gradient. China
+  (Step 17) needed real code changes, but only because its bank broke two previously-unstated
+  assumptions (fewer indexed sprite variants than every earlier bank, `mainMusic` instead of
+  `musicMain`) — both fixes are generic, not China-specific, so a 7th theme repeating either
+  should now need zero code changes too. See "Adding China: variant-count and music-name
+  fallbacks (Step 17)" above.
 - The win-line dash (small win) is a single horizontal line; a big win's 9-tile blackout has no
   equivalent multi-line dash effect (explicitly deferred — see comment in `GameController.js`).
 

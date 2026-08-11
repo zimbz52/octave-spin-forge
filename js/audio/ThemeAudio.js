@@ -11,9 +11,10 @@ import { devMixer } from "./DevMixer.js";
 // Our 5 generic symbols map onto the sprite-naming convention every theme's sound
 // bank is expected to follow (winSymbol01-04, winSymbolWild) — this mapping is part
 // of the abstract template, not tied to any one theme. symbol04 (formerly Scatter,
-// see SpinSequence.js) is a special case: every theme bank provided so far still only
-// defines winSymbolScatter, not winSymbol04 — playSymbolWin() below falls back to it
-// dynamically rather than this map needing two entries.
+// see SpinSequence.js) is a special case: egypt/mexico/arcade/football all predate the
+// rename and only define winSymbolScatter, not winSymbol04 — playSymbolWin() below
+// falls back to it dynamically rather than this map needing two entries. chinaSounds.json
+// is the first bank to define winSymbol04 directly, so it never hits that fallback.
 const SYMBOL_SPRITE_MAP = {
   symbol01: "winSymbol01",
   symbol02: "winSymbol02",
@@ -40,17 +41,13 @@ const MUSIC_FADE_IN_MS = 2000;
 // fader is set to, rather than changing what the fader itself reports/controls.
 const MUSIC_VOLUME_TRIM = 0.9;
 
-function randomIndexedName(prefix, count) {
-  const n = Math.floor(Math.random() * count) + 1;
-  return `${prefix}${String(n).padStart(2, "0")}`;
-}
-
 class ThemeAudio {
   constructor() {
     this.howl = null;
     this.musicId = null;
     this.ambientId = null;
     this.riserId = null;
+    this.smallWinDigitsId = null;
     this.ready = false;
     this.currentTheme = null;
     this._loadToken = 0;
@@ -136,6 +133,7 @@ class ThemeAudio {
     this.musicId = null;
     this.ambientId = null;
     this.riserId = null;
+    this.smallWinDigitsId = null;
     this.ready = false;
     this._spriteNames = new Set();
     this._musicVolumeBeforeDuck = null;
@@ -165,7 +163,9 @@ class ThemeAudio {
   _playMusicLoop() {
     // Strict singleton: never start a second overlapping music-loop instance.
     if (this.musicId !== null && this.howl.playing(this.musicId)) return;
-    this.musicId = this.howl.play("musicMain");
+    const spriteName = this._musicSpriteName();
+    if (!spriteName) return; // bank defines no music track under either known name
+    this.musicId = this.howl.play(spriteName);
     this.howl.loop(true, this.musicId);
     // Fades in from silence up to the fader's current target (0 if the player already
     // muted the music) rather than snapping straight there — musicMain now starts
@@ -173,6 +173,16 @@ class ThemeAudio {
     // overlap instead of both hitting full volume at once. Howler's fade() sets the
     // starting volume itself; no separate .volume(0, id) call needed first.
     this.howl.fade(0, this._musicTargetVolume(), MUSIC_FADE_IN_MS, this.musicId);
+  }
+
+  // Prefers the standard "musicMain" name; falls back to "mainMusic" for banks that
+  // used the words in the other order (first seen in chinaSounds.json) — same dynamic-
+  // fallback shape as playSymbolWin()'s Scatter/symbol04 handling below, not a JSON
+  // edit (provided configs are copied byte-for-byte, never renamed — see rule #4).
+  _musicSpriteName() {
+    if (this._spriteNames.has("musicMain")) return "musicMain";
+    if (this._spriteNames.has("mainMusic")) return "mainMusic";
+    return null;
   }
 
   // Sets only the music track's volume (0.0-1.0), leaving UI sounds and thematic SFX
@@ -199,7 +209,7 @@ class ThemeAudio {
   // theme — the actual number musicMain's Howler volume should be set to at any given
   // moment (fade-in target, live fader/mixer changes, post-duck restore).
   _musicTargetVolume() {
-    return this._scaledMusicVolume() * this._busGain("musicMain");
+    return this._scaledMusicVolume() * this._busGain(this._musicSpriteName() ?? "musicMain");
   }
 
   // Re-applies the current target volume to whatever's actually playing on musicId —
@@ -246,25 +256,72 @@ class ThemeAudio {
     return id;
   }
 
+  // Picks a random sprite name matching "<prefix><NN>" from whatever the active bank
+  // actually defines, rather than assuming every bank provides a fixed count (reelStart
+  // 5, reelTurbo 5, winSmall 4, etc.) — chinaSounds.json only defines 3 reelStart/
+  // reelTurbo variants and 3 winSmall variants, fewer than every earlier bank, which is
+  // exactly the case this guards against: calling Howler with a sprite name the active
+  // bank never declared. Returns null (caller no-ops) if the bank defines none at all
+  // for this prefix.
+  _randomAvailableIndexedName(prefix) {
+    const pattern = new RegExp(`^${prefix}\\d+$`);
+    const matches = [...this._spriteNames].filter((name) => pattern.test(name));
+    if (matches.length === 0) return null;
+    return matches[Math.floor(Math.random() * matches.length)];
+  }
+
   // --- Reel mechanics ---
 
   playReelStart() {
-    this._play(randomIndexedName("reelStart", 5));
+    const name = this._randomAvailableIndexedName("reelStart");
+    if (name) this._play(name);
   }
 
   playReelStop() {
-    this._play(randomIndexedName("reelStop", 5));
+    const name = this._randomAvailableIndexedName("reelStop");
+    if (name) this._play(name);
   }
 
   // Fast mode replaces the standard start/stop sequence with a single turbo cue.
   playReelTurbo() {
-    this._play(randomIndexedName("reelTurbo", 5));
+    const name = this._randomAvailableIndexedName("reelTurbo");
+    if (name) this._play(name);
   }
 
   // --- Win mechanics ---
 
   playSmallWin() {
-    this._play(randomIndexedName("winSmall", 4), dbToGain(SMALL_WIN_VOLUME_DB));
+    const name = this._randomAvailableIndexedName("winSmall");
+    if (name) this._play(name, dbToGain(SMALL_WIN_VOLUME_DB));
+  }
+
+  // Starts the (typically looping) sound bed under the small-win counter's roll-up —
+  // the small-win equivalent of playBigWinRiser(). No-ops quietly if the active bank
+  // doesn't define winSmallDigits (only chinaSounds.json does so far); same guarded
+  // shape as playPowerBetOn/Off below, becomes live automatically the moment a bank
+  // defines it.
+  playSmallWinDigits() {
+    if (!this._spriteNames.has("winSmallDigits")) return;
+    this.smallWinDigitsId = this._play("winSmallDigits");
+    if (this.smallWinDigitsId !== null) this.howl.loop(true, this.smallWinDigitsId);
+  }
+
+  // Stops the digit-roll bed and, from its own stop callback, immediately fires the
+  // completion sting — the small-win equivalent of stopBigWinRiser()/winBigRiserEnd's
+  // "stop chains straight into the payoff cue" pattern above.
+  stopSmallWinDigits() {
+    if (!this.howl || this.smallWinDigitsId === null) return;
+    const id = this.smallWinDigitsId;
+    this.smallWinDigitsId = null;
+    const hasEndSting = this._spriteNames.has("winSmallDigitsEnd");
+    this.howl.once(
+      "stop",
+      () => {
+        if (hasEndSting) this._play("winSmallDigitsEnd");
+      },
+      id
+    );
+    this.howl.stop(id);
   }
 
   // Dynamically checks the active bank for the symbol's own sprite first; symbol04
@@ -332,11 +389,11 @@ class ThemeAudio {
 
   // --- Powerbet ---
 
-  // powerBetOn/powerBetOff don't exist in any theme bank yet (expected soon per
-  // product) — unlike playSymbolWin()'s Scatter fallback, there's no substitute sprite
-  // to fall back to here, so this just checks _spriteNames and no-ops quietly if
-  // missing rather than risking an undefined-sprite call into Howler. Safe to call
-  // freely; becomes live automatically the moment a bank actually defines these.
+  // Not every bank defines powerBetOn/powerBetOff (chinaSounds.json is the first that
+  // does) — unlike playSymbolWin()'s Scatter fallback, there's no substitute sprite to
+  // fall back to here, so this just checks _spriteNames and no-ops quietly if missing
+  // rather than risking an undefined-sprite call into Howler. Safe to call freely on
+  // any theme; becomes live automatically the moment a bank defines these.
   playPowerBetOn() {
     if (this._spriteNames.has("powerBetOn")) this._play("powerBetOn");
   }
