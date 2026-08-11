@@ -886,6 +886,19 @@ floating dock). **The floating dock was chosen.** What that means concretely:
       couple of active channels in the profiler) with margin, not their absolute worst case
       (`.audio-profiler`'s `max-height: 260px` if many channels were active at once, which is
       transient, not the steady state this was tuned against).
+    - **`100vh` vs `100dvh` — a real-device gap this project's testing can't catch.** `body`'s
+      centering used plain `min-height: 100vh`, which on real mobile Safari/Chrome is pinned to
+      the *largest* possible viewport (browser chrome fully collapsed), not whatever's actually
+      visible (usually smaller, since that chrome starts out shown). The Browser-pane tool's
+      mobile emulation is a fixed-size viewport with no collapsing chrome to diverge from, so
+      this gap is structurally invisible to every mobile test done in this environment — a user
+      reported "still overlapping on my actual phone" after the fix above tested clean here,
+      which is exactly the symptom this would cause. Fixed by adding `min-height: 100dvh` right
+      after the `100vh` line (progressive enhancement — unsupporting browsers just keep the
+      `100vh` fallback, since they don't recognize the `dvh` declaration at all). **Any future
+      "works in the Browser-pane tool but not on a real phone" mobile report is worth checking
+      against this exact gap first** — this tool cannot reproduce or verify real dynamic-viewport
+      behavior at all, only fixed-size emulation.
 
     **If anything else ever gets added near a cabinet edge or corner, measure
     `getBoundingClientRect()` against both fixed panels at multiple viewport sizes before

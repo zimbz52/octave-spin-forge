@@ -37,6 +37,16 @@ html, body {
 body {
   margin: 0;
   min-height: 100vh;
+  /* 100vh on real mobile browsers (iOS Safari in particular) is pinned to the
+     *largest* possible viewport — chrome (address bar) fully collapsed — not the
+     actual visible area, which is usually smaller since that chrome starts out
+     visible. That mismatch is invisible in this project's Browser-pane testing (a
+     fixed-size emulated viewport, no collapsing chrome to diverge from) but real on an
+     actual phone: body's centering math and the fixed-position corner docks below can
+     end up reasoning about different-sized boxes. 100dvh ("dynamic viewport height")
+     tracks the real visible area live as the chrome shows/hides — declared after the
+     100vh fallback so unsupporting browsers silently keep that instead. */
+  min-height: 100dvh;
   display: flex;
   /* "safe center": centers when the content fits, but falls back to start-aligned
      when it doesn't — plain "center" would center content taller than the viewport
