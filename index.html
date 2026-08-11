@@ -189,13 +189,37 @@
        playing across systemSounds and the active theme bank. Never intercepts clicks
        (pointer-events:none) — purely a debug/showcase HUD. -->
   <div class="audio-profiler" id="audio-profiler" aria-hidden="true">
-    <div class="audio-profiler__header">
+    <div class="audio-profiler__header" id="audio-profiler-header">
       <span class="audio-profiler__header-dot" aria-hidden="true"></span>
       SIGNAL MONITOR
     </div>
     <div class="audio-profiler__list" id="audio-profiler-list">
       <div class="audio-profiler__empty" id="audio-profiler-empty">— no active channels —</div>
     </div>
+  </div>
+
+  <!-- Dev mixer: hidden per-theme bus-gain console, revealed by triple-clicking the
+       Signal Monitor's header above (see DevMixerPanel.js). Not part of the
+       player-facing experience — deliberately undiscoverable, no visible affordance
+       pointing to it. Hidden via opacity/pointer-events (dev-mixer--visible toggles
+       both), not the hidden attribute, so it can transition in/out. -->
+  <div class="dev-mixer" id="dev-mixer" aria-hidden="true">
+    <div class="dev-mixer__header">
+      <span class="dev-mixer__title">DEV MIXER — <span id="dev-mixer-theme">—</span></span>
+      <button id="dev-mixer-close-btn" class="dev-mixer__close" type="button" aria-label="Close dev mixer">&times;</button>
+    </div>
+    <div class="dev-mixer__buses" id="dev-mixer-buses"></div>
+    <div class="dev-mixer__export-row">
+      <button id="dev-mixer-export-btn" class="dev-mixer__export-btn" type="button">Export Config</button>
+      <span class="dev-mixer__export-status" id="dev-mixer-export-status"></span>
+    </div>
+    <textarea
+      id="dev-mixer-export-output"
+      class="dev-mixer__export-output"
+      readonly
+      hidden
+      aria-label="Exported theme mix JSON"
+    ></textarea>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>

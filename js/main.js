@@ -3,6 +3,7 @@ import { themeAudio } from "./audio/ThemeAudio.js";
 import { unlockAudioContext } from "./audio/audioUtils.js";
 import { playPowerBetOn, playPowerBetOff } from "./audio/audioHooks.js";
 import { AudioProfiler } from "./audio/AudioProfiler.js";
+import { DevMixerPanel } from "./audio/DevMixerPanel.js";
 import { ThemeTransition } from "./theme/ThemeTransition.js";
 import { WelcomeScreen } from "./theme/WelcomeScreen.js";
 import { StartupTerminal } from "./theme/StartupTerminal.js";
@@ -105,7 +106,7 @@ function wireAudioControls() {
   syncFaderFill();
 }
 
-function wireThemeSelect(themeTransition) {
+function wireThemeSelect(themeTransition, devMixerPanel) {
   const themeSelect = document.getElementById("theme-select");
   themeSelect.addEventListener("change", async (event) => {
     // Disabled for the duration so a second switch can't fire mid-fade — the fade
@@ -114,6 +115,10 @@ function wireThemeSelect(themeTransition) {
     themeSelect.disabled = true;
     await themeTransition.swapTo(event.target.value);
     themeSelect.disabled = false;
+    // Keeps the dev mixer showing the newly-active theme's bus mix even if it's
+    // sitting open through a theme switch, not just the theme that was active when it
+    // was last opened.
+    devMixerPanel.refresh();
   });
 }
 
@@ -210,11 +215,16 @@ async function init() {
   );
   audioProfiler.start();
 
+  const devMixerPanel = new DevMixerPanel(
+    document.getElementById("dev-mixer"),
+    document.getElementById("audio-profiler-header")
+  );
+
   const themeSelect = document.getElementById("theme-select");
   populateThemeSelect(themeSelect);
 
   const themeTransition = new ThemeTransition(document.getElementById("fade-overlay"));
-  wireThemeSelect(themeTransition);
+  wireThemeSelect(themeTransition, devMixerPanel);
   const game = wireGame();
 
   // Gatekeeper: nothing thematic loads — no theme JSON fetch, no ThemeAudio Howl
@@ -249,6 +259,7 @@ async function init() {
   const chosenThemeId = await startupTerminal.waitForSelection();
   themeSelect.value = chosenThemeId;
   await themeTransition.enterFromTerminal(chosenThemeId, startupTerminal);
+  devMixerPanel.refresh();
 
   // The reel grid's initial measurement (game.showInitial(), above) ran while the
   // terminal still covered the cabinet, before the browser was guaranteed to have

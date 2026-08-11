@@ -6,7 +6,11 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 15
+Read this file first in any new session on this project. It reflects the state after Step 16
+(a hidden developer tool — triple-click the Signal Monitor's header to reveal a per-theme
+bus-gain mixing console, with sliders for 7 buses covering every sprite in the game and an
+Export Config button that stringifies the adjusted multipliers to the clipboard; see "Dev mixer
+& bus routing (Step 16)" below). Before that: Step 15
 (the standalone `.topbar` panel is gone entirely — the "OCTAVE SPIN FORGE" title moved into
 `.cabinet__frame` as `.cabinet__title`, centered above the reels, and the theme `<select>` moved
 into the floating `#audio-dock` alongside Master Mute and the music fader, as a third dock pill;
@@ -150,6 +154,18 @@ js/audio/
                                    playing" API) every 200ms and renders one row per actively-
                                    playing sound into `#audio-profiler-list`. Never calls into any
                                    audio API — read-only.
+  busRouting.js                    Step 16. Single source of truth mapping a sprite name (prefix-
+                                   matched) to its dev-mixer bus — busReelsNormal/busReelsTurbo/
+                                   busMusic/busAtmosphere/busWinsSmall/busWinsSymbol/busWinsBig.
+                                   `getBusForSprite(name)` + the `BUS_NAMES` list both the mixer
+                                   panel and ThemeAudio import from here.
+  DevMixer.js                      Step 16. Pure state: `themeMixes` (per-theme bus-gain
+                                   multipliers, in-memory only), `getBusVolume`/`setBusVolume`/
+                                   `getThemeMix`/`exportJSON()`. No DOM, no Howler — see "Dev
+                                   mixer & bus routing (Step 16)" below.
+  DevMixerPanel.js                 Step 16. The hidden mixer's DOM/UI: builds one slider per bus,
+                                   the triple-click reveal on the Signal Monitor's header, and the
+                                   Export Config button (clipboard write + textarea fallback).
 
 src/audio/                      Theme + system audio JSON configs (exact copies of provided
                                  files, see rule #4 above).
@@ -547,6 +563,94 @@ to `70px` under a `@media (max-width: 600px)` rule (matching the breakpoint gotc
 uses) so the now-narrower mobile dock doesn't get pulled wide again by the select alone. Same
 `text-overflow: ellipsis; white-space: nowrap; overflow: hidden;` truncation pattern as gotcha #6
 — "Vintage Arcade" reads in full on desktop, truncates to "Vintag…" on narrow viewports.
+
+---
+
+## Dev mixer & bus routing (Step 16)
+
+**What this is:** a hidden, undocumented-in-the-UI developer tool for tuning per-theme relative
+volumes of groups of sprites ("buses") and exporting the result as JSON to hand-copy into the
+project once mixing is finalized. Not a player-facing feature — no button, label, or hint anywhere
+in the visible UI points to it.
+
+**Bus routing (`busRouting.js`):** every sprite name in the game maps, by prefix, to exactly one
+of 7 buses:
+
+| Bus | Sprites |
+|---|---|
+| `busReelsNormal` | `reelStart01-05`, `reelStop01-05` |
+| `busReelsTurbo` | `reelTurbo01-05` |
+| `busMusic` | `musicMain` |
+| `busAtmosphere` | `gameAmbLP`, `gameStart` |
+| `busWinsSmall` | `winSmall01-04` |
+| `busWinsSymbol` | `winSymbol01-04`, `winSymbolWild`, `winSymbolScatter` |
+| `busWinsBig` | `winBigRiser`, `winBigRiserEnd`, `winBigT1`, `powerBetOn`, `powerBetOff` |
+
+`getBusForSprite(name)` does the prefix match; `BUS_NAMES` is the canonical ordered list both
+`ThemeAudio` and `DevMixerPanel` read from — adding an 8th bus is a one-rule addition to
+`BUS_RULES`, nothing else needs to change.
+
+**State (`DevMixer.js`):** `themeMixes` is a plain in-memory object, `{ <themeId>: { <busName>:
+<multiplier> } }`. Every bus defaults to `1` (no change) until a slider actually touches it —
+`getBusVolume()`/`getThemeMix()` fill in that default rather than requiring every bus to be
+pre-populated for every theme. Deliberately not persisted (no `localStorage`) — this is a tool for
+arriving at numbers to hardcode elsewhere, not a setting a player's session should remember,
+matching how Master Mute/the fader position already don't survive a reload either.
+
+**Range is 0-1 (trim/attenuate only, no boost) — this is a hard ceiling, not a UI choice.**
+`setBusVolume()` clamps to `[0, 1]` and the mixer panel's sliders cap at `max="1"` to match.
+Originally allowed up to 2x (200%) with no clamp; a value above 1 passed to Howler's own
+`.volume()` setter is silently ignored (no error, no boosted sound — the sound just keeps
+whatever gain it already had), discovered when an exported `busWinsBig: 1.3` for Football
+audibly did nothing. If a real boost is ever needed, it has to happen at the source (louder
+source audio, or `baseVolume` in `ThemeAudio._play()`), not via a bus multiplier above 1.
+
+**How a bus gain actually reaches Howler (`ThemeAudio.js`):** `_play(name, baseVolume = 1)` is the
+one chokepoint nearly every sprite plays through — it multiplies `baseVolume` (1 for plain
+one-shots, a dB-derived trim for `winSmall`, see `playSmallWin()`) by `_busGain(name)`
+(`devMixer.getBusVolume(this.currentTheme, bus)`) and sets that as the sound's Howler volume the
+instant it starts. This is why adding bus support needed no changes at all to `playReelStart`,
+`playSymbolWin`, `playBigWinIntro`, `playPowerBetOn/Off`, etc. — they all already funnel through
+`_play()`. **`musicMain` and `gameAmbLP` are the two exceptions**, since they're long-running loops
+started via direct `this.howl.play()` calls (for their own id-tracking/looping reasons, not via
+`_play()`) rather than one-shots — `_musicTargetVolume()` (fader raw value × `MUSIC_VOLUME_TRIM` ×
+`busMusic` gain) and `refreshAmbientVolume()`'s equivalent for `gameAmbLP` are the analogous
+chokepoints for those two, and both have a public `refresh*Volume()` method the mixer panel calls
+right after a relevant slider moves — so, unlike one-shots (which just pick up the new gain next
+time they naturally play), music and ambience react to a mid-song slider drag *immediately*.
+`refreshBusLive(bus)` is the single entry point `DevMixerPanel` calls for this; it no-ops for the
+5 buses with no continuous sound on them.
+
+**Reveal mechanism (`DevMixerPanel.js`):** the Signal Monitor panel (`#audio-profiler`) is
+`pointer-events: none` end-to-end (a pure readout, see "Audio profiler" below) — its header
+(`#audio-profiler-header`) alone gets `pointer-events: auto` + `cursor: pointer` back specifically
+so it can be a click target, without the rest of the panel starting to intercept clicks meant for
+whatever's behind it. Reveal is a manual click-counter with a reset timeout
+(`TRIPLE_CLICK_WINDOW_MS`, 500ms) — 3 ordinary `click` events within the window toggles the panel
+— rather than relying on any browser-native "triple-click" concept, since `dblclick` has no triple
+equivalent and a click event's own `detail` count isn't consistently trustworthy for this across
+browsers.
+
+**Export Config:** stringifies `devMixer.themeMixes` (`JSON.stringify(..., null, 2)`) and always
+writes it into a `<textarea readonly>` (hidden until first export) so the result is visible and
+manually copyable no matter what; it also *attempts*
+`navigator.clipboard.writeText()` and reports "Copied to clipboard" if that succeeds, falling back
+to `.select()`-ing the textarea and reporting "Select + copy below" if the Clipboard API throws
+(no permission, insecure context, etc.) — never a dead end either way. **A real click (not a
+synthetic/programmatic `.click()`) is required for `writeText()` to succeed** — Chrome doesn't
+treat script-triggered clicks as the "trusted user activation" the Clipboard API needs, confirmed
+directly while building this: a synthetic click from the console reliably hit the fallback path,
+a real click did not error. Worth remembering if a future automated test ever "detects" this as
+broken — it may just be testing via a synthetic click.
+
+**Theme-scoping:** the mixer only ever reads/writes the currently active theme's entry
+(`themeAudio.currentTheme`) — switching themes while the panel is open re-renders every slider
+from that theme's own (independent) stored mix via `refresh()`, called from `main.js` right after
+both `themeTransition.enterFromTerminal()` (cold start) and `.swapTo()` (in-game switch) resolve,
+so the panel is never stale even if it wasn't open at the moment the switch happened. Verified
+live: setting Egypt's `busMusic` to 50%, switching to Football, confirming Football's own
+`busMusic` slider read back 100% (its own untouched default, not leaking Egypt's value) and its
+actual Howler gain was `0.9` (fader × `MUSIC_VOLUME_TRIM` only) — not `0.45`.
 
 ---
 

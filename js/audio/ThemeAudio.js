@@ -5,6 +5,8 @@
 // active theme's name.
 
 import { dbToGain } from "./audioUtils.js";
+import { getBusForSprite } from "./busRouting.js";
+import { devMixer } from "./DevMixer.js";
 
 // Our 5 generic symbols map onto the sprite-naming convention every theme's sound
 // bank is expected to follow (winSymbol01-04, winSymbolWild) — this mapping is part
@@ -32,6 +34,11 @@ const MUSIC_DUCK_MS = 1000;
 // musicMain fades in from silence rather than snapping straight to its target volume —
 // see _playMusicLoop().
 const MUSIC_FADE_IN_MS = 2000;
+
+// Overall music trim, independent of the player-facing fader (which stays a full
+// 0-100% range) — knocks every actual musicMain gain down 10% on top of whatever the
+// fader is set to, rather than changing what the fader itself reports/controls.
+const MUSIC_VOLUME_TRIM = 0.9;
 
 function randomIndexedName(prefix, count) {
   const n = Math.floor(Math.random() * count) + 1;
@@ -152,6 +159,7 @@ class ThemeAudio {
     if (this.ambientId !== null && this.howl.playing(this.ambientId)) return; // singleton
     this.ambientId = this.howl.play("gameAmbLP");
     this.howl.loop(true, this.ambientId);
+    this.howl.volume(this._busGain("gameAmbLP"), this.ambientId);
   }
 
   _playMusicLoop() {
@@ -164,7 +172,7 @@ class ThemeAudio {
     // alongside gameStart instead of waiting for it, so this softens the moment they
     // overlap instead of both hitting full volume at once. Howler's fade() sets the
     // starting volume itself; no separate .volume(0, id) call needed first.
-    this.howl.fade(0, this.musicVolume, MUSIC_FADE_IN_MS, this.musicId);
+    this.howl.fade(0, this._musicTargetVolume(), MUSIC_FADE_IN_MS, this.musicId);
   }
 
   // Sets only the music track's volume (0.0-1.0), leaving UI sounds and thematic SFX
@@ -172,16 +180,70 @@ class ThemeAudio {
   // loaded theme's music starts at whatever level the player last set the fader to.
   // Master Mute overrides this at the Howler.mute() level regardless of this value —
   // this only ever controls musicMain's own gain, never whether it's globally audible.
+  // Stores the raw fader value (0.0-1.0) — MUSIC_VOLUME_TRIM and the dev mixer's
+  // busMusic gain are applied only when this turns into an actual Howler gain, so the
+  // fader itself still reports/reaches 100%.
   setMusicVolume(volume) {
     this.musicVolume = volume;
-    if (this.howl && this.musicId !== null) {
-      this.howl.volume(volume, this.musicId);
-    }
+    this.refreshMusicVolume();
   }
 
-  _play(name) {
+  // The fader's raw 0.0-1.0 value, with MUSIC_VOLUME_TRIM applied — everywhere the
+  // fader's raw value becomes a real Howler volume should go through this, not
+  // this.musicVolume directly.
+  _scaledMusicVolume() {
+    return this.musicVolume * MUSIC_VOLUME_TRIM;
+  }
+
+  // _scaledMusicVolume() layered with the dev mixer's busMusic gain for the active
+  // theme — the actual number musicMain's Howler volume should be set to at any given
+  // moment (fade-in target, live fader/mixer changes, post-duck restore).
+  _musicTargetVolume() {
+    return this._scaledMusicVolume() * this._busGain("musicMain");
+  }
+
+  // Re-applies the current target volume to whatever's actually playing on musicId —
+  // called after either the fader or the dev mixer's busMusic slider changes, so a
+  // continuous loop reacts live instead of only picking up the new value next time it
+  // starts. No-ops harmlessly if music isn't playing yet.
+  refreshMusicVolume() {
+    if (!this.howl || this.musicId === null) return;
+    this.howl.volume(this._musicTargetVolume(), this.musicId);
+  }
+
+  // Same live-refresh idea as refreshMusicVolume(), for the ambient loop's own bus
+  // (busAtmosphere) — the ambient loop is the only continuous sound on that bus;
+  // gameStart is a one-shot and just picks up the current gain next time it plays.
+  refreshAmbientVolume() {
+    if (!this.howl || this.ambientId === null) return;
+    this.howl.volume(this._busGain("gameAmbLP"), this.ambientId);
+  }
+
+  // Called by the dev mixer panel right after a bus slider changes, so whichever
+  // continuous sound (if any) lives on that bus updates immediately rather than
+  // waiting for its next natural (re)start.
+  refreshBusLive(bus) {
+    if (bus === "busMusic") this.refreshMusicVolume();
+    if (bus === "busAtmosphere") this.refreshAmbientVolume();
+  }
+
+  // The dev mixer's per-theme multiplier for whichever bus this sprite belongs to
+  // (see busRouting.js) — 1 (no change) for sprites with no defined bus or a theme
+  // that's never been touched in the mixer.
+  _busGain(name) {
+    const bus = getBusForSprite(name);
+    if (!bus) return 1;
+    return devMixer.getBusVolume(this.currentTheme, bus);
+  }
+
+  // baseVolume is the sprite's own intended volume before any bus gain (1 for plain
+  // one-shots, a dB-derived trim for e.g. winSmall — see playSmallWin()) — the dev
+  // mixer's bus multiplier always applies on top of it, never replaces it.
+  _play(name, baseVolume = 1) {
     if (!this.ready || !this.howl) return null;
-    return this.howl.play(name);
+    const id = this.howl.play(name);
+    this.howl.volume(baseVolume * this._busGain(name), id);
+    return id;
   }
 
   // --- Reel mechanics ---
@@ -202,8 +264,7 @@ class ThemeAudio {
   // --- Win mechanics ---
 
   playSmallWin() {
-    const id = this._play(randomIndexedName("winSmall", 4));
-    if (id !== null) this.howl.volume(dbToGain(SMALL_WIN_VOLUME_DB), id);
+    this._play(randomIndexedName("winSmall", 4), dbToGain(SMALL_WIN_VOLUME_DB));
   }
 
   // Dynamically checks the active bank for the symbol's own sprite first; symbol04
@@ -259,7 +320,7 @@ class ThemeAudio {
 
   _unduckMusic() {
     if (!this.howl || this.musicId === null) return;
-    const restoreTo = this._musicVolumeBeforeDuck ?? 1;
+    const restoreTo = this._musicVolumeBeforeDuck ?? this._musicTargetVolume();
     this._musicVolumeBeforeDuck = null;
     this.howl.fade(this.howl.volume(this.musicId), restoreTo, MUSIC_DUCK_MS, this.musicId);
   }

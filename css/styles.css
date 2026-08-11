@@ -1,4 +1,10 @@
 :root {
+  /* App is dark-only, no light variant — without this, native form-control chrome
+     (the theme <select>'s dropdown popup, in particular) renders with light OS
+     chrome by default, while its <option> text still inherits --text-light (near-
+     white) from the CSS below, producing unreadable white-on-white in the popup. */
+  color-scheme: dark;
+
   --bg-deep: #0b0c10;
   /* Shared "terminal" panel language — one set of tokens for every panel in the app
      (topbar, cabinet), not a separate "metal plate" palette for the cabinet and a
@@ -313,6 +319,15 @@ body {
 .audio-dock__theme-select:focus-visible {
   outline: 2px solid var(--cabinet-accent);
   outline-offset: 2px;
+}
+
+/* color-scheme: dark (see :root) is the general fix for native form-control chrome,
+   but the select popup's own <option> background isn't guaranteed to pick that up in
+   every browser — style it explicitly too, since background-color/color on <option>
+   is well-supported directly. Belt-and-suspenders against light-chrome popups. */
+.audio-dock__theme-select option {
+  background-color: var(--panel-bg-1);
+  color: var(--text-light);
 }
 
 /* The theme row's full-width label + wider select (140px) make .audio-dock noticeably
@@ -762,6 +777,12 @@ body {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #6be6c1;
+  /* The panel itself is pointer-events:none (a pure readout, see .audio-profiler
+     above) — re-enabled on just the header so it can be the dev mixer's triple-click
+     reveal target (DevMixerPanel.js) without the rest of the panel starting to
+     intercept clicks meant for whatever's behind it. */
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .audio-profiler__header-dot {
@@ -845,6 +866,144 @@ body {
   height: 100%;
   background: linear-gradient(90deg, #2fae8b, #6be6c1);
   transition: width 0.18s ease;
+}
+
+/* ---------- Dev mixer (hidden developer tool) ---------- */
+/* Not part of the player-facing experience — a per-theme bus-gain tuning console,
+   revealed only by triple-clicking the Signal Monitor's header (see
+   DevMixerPanel.js). Reuses the Signal Monitor's cool cyan "debug instrument" accent
+   so the two panels read as one family of tool, distinct from the cabinet's gold. */
+.dev-mixer {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 500;
+  width: min(320px, calc(100vw - 32px));
+  max-height: min(480px, calc(100vh - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg-1);
+  border: 1px solid rgba(110, 230, 200, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.55);
+  font-family: "Courier New", monospace;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.dev-mixer--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.dev-mixer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(110, 230, 200, 0.2);
+}
+
+.dev-mixer__title {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6be6c1;
+}
+
+.dev-mixer__close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.dev-mixer__close:hover {
+  color: var(--text-light);
+}
+
+.dev-mixer__buses {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.dev-mixer__bus-row {
+  display: grid;
+  grid-template-columns: 92px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+}
+
+.dev-mixer__bus-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dev-mixer__bus-range {
+  width: 100%;
+  accent-color: #6be6c1;
+}
+
+.dev-mixer__bus-value {
+  font-size: 0.62rem;
+  color: #d8f5ec;
+  text-align: right;
+}
+
+.dev-mixer__export-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(110, 230, 200, 0.2);
+}
+
+.dev-mixer__export-btn {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  color: var(--text-light);
+  font-family: inherit;
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.dev-mixer__export-btn:hover {
+  border-color: #6be6c1;
+}
+
+.dev-mixer__export-status {
+  font-size: 0.6rem;
+  color: #6be6c1;
+}
+
+.dev-mixer__export-output {
+  margin: 0 12px 12px;
+  min-height: 90px;
+  resize: vertical;
+  background: var(--glass-bg);
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  color: #d8f5ec;
+  font-family: "Courier New", monospace;
+  font-size: 0.62rem;
+  padding: 8px;
 }
 
 @keyframes audio-profiler-blink {
