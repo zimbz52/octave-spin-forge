@@ -12,17 +12,10 @@
 <body>
   <div class="app">
 
-    <header class="topbar">
-      <h1 class="topbar__title">OCTAVE&nbsp;SPIN&nbsp;FORGE</h1>
-
-      <div class="topbar__theme">
-        <label for="theme-select" class="topbar__theme-label">Theme</label>
-        <select id="theme-select" class="topbar__theme-select" data-sfx-hover data-sfx-click></select>
-      </div>
-    </header>
-
     <main class="cabinet">
       <div class="cabinet__frame">
+        <h1 class="cabinet__title">OCTAVE&nbsp;SPIN&nbsp;FORGE</h1>
+
         <div class="cabinet__glass">
           <div class="reels" id="reels">
             <div class="reel" data-reel="0"><div class="reel__strip"></div></div>
@@ -77,31 +70,44 @@
        pattern as the Signal Monitor panel, opposite corner) so it costs no vertical
        layout space — that's what keeps Spin above the fold. -->
   <div class="audio-dock" id="audio-dock">
-    <button
-      id="master-mute-btn"
-      class="audio-toggle-btn"
-      type="button"
-      data-sfx-hover
-      data-sfx-click
-      aria-pressed="false"
-      aria-label="Master mute"
-      title="Master mute"
-    >
-      <span class="audio-toggle-btn__icon" aria-hidden="true">&#128266;</span>
-    </button>
+    <div class="audio-dock__row">
+      <button
+        id="master-mute-btn"
+        class="audio-toggle-btn"
+        type="button"
+        data-sfx-hover
+        data-sfx-click
+        aria-pressed="false"
+        aria-label="Master mute"
+        title="Master mute"
+      >
+        <span class="audio-toggle-btn__icon" aria-hidden="true">&#128266;</span>
+      </button>
 
-    <div class="audio-fader" id="music-fader-wrap" data-sfx-hover title="Music volume">
-      <span class="audio-fader__icon" aria-hidden="true">&#127925;</span>
-      <input
-        type="range"
-        id="music-fader"
-        class="audio-fader__range"
-        min="0"
-        max="1"
-        step="0.01"
-        value="1"
-        aria-label="Music volume"
-      />
+      <div class="audio-fader" id="music-fader-wrap" data-sfx-hover title="Music volume">
+        <span class="audio-fader__icon" aria-hidden="true">&#127925;</span>
+        <input
+          type="range"
+          id="music-fader"
+          class="audio-fader__range"
+          min="0"
+          max="1"
+          step="0.01"
+          value="1"
+          aria-label="Music volume"
+        />
+      </div>
+    </div>
+
+    <div class="audio-dock__theme" id="theme-select-wrap" data-sfx-hover title="Theme">
+      <span class="audio-dock__theme-label" aria-hidden="true">THEME:</span>
+      <select
+        id="theme-select"
+        class="audio-dock__theme-select"
+        data-sfx-hover
+        data-sfx-click
+        aria-label="Theme"
+      ></select>
     </div>
   </div>
 

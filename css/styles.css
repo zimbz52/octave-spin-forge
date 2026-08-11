@@ -23,6 +23,18 @@
   --symbol-wild: #d4af37;
   --symbol-04: #b06fe0;
 
+  /* Brushed anodized aluminum (Step 14) — the shared physical-hardware material for
+     Spin, Powerbet, and Fast/Slow, so all three read as one family of heavy metal
+     controls bolted to the cabinet rather than separate flat UI widgets. Powerbet and
+     Fast/Slow use this neutral silver palette directly; Spin reuses the exact same
+     technique (brush texture + light-to-dark sheen + bevel + heavy drop shadow) with
+     gold-anodized stops instead, to stay the visually dominant control. */
+  --metal-hi: #eef0f3;
+  --metal-light: #c4c6cc;
+  --metal-mid: #8d8f97;
+  --metal-dark: #55565c;
+  --metal-shadow: #1c1c1f;
+
   --radius-md: 12px;
 }
 
@@ -96,124 +108,40 @@ body {
   }
 }
 
-/* ---------- Topbar ---------- */
-/* Title + theme select share one row — this used to be two rows (a separate
-   full-width theme bar) before Master Mute/the music fader moved out to the floating
-   audio dock; with that space freed up, the select has plenty of room here instead. */
-
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 18px;
-  background: linear-gradient(180deg, var(--panel-bg-1) 0%, var(--panel-bg-2) 100%);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.5);
-}
-
-.topbar__title {
-  margin: 0;
-  font-size: 1.05rem;
-  letter-spacing: 0.14em;
-  color: var(--cabinet-accent);
-  text-shadow: 0 0 10px rgba(212, 175, 55, 0.35);
-  flex-shrink: 0;
-}
-
-.topbar__theme {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  justify-content: flex-end;
-}
-
-.topbar__theme-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
-  flex-shrink: 0;
-}
-
-.topbar__theme-select {
-  flex: 1;
-  min-width: 0;
-  max-width: 220px;
-  appearance: none;
-  background: var(--control-bg);
-  color: var(--text-light);
-  border: 1px solid var(--control-border);
-  border-radius: 8px;
-  padding: 7px 30px 7px 12px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
-    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
-  background-position: calc(100% - 16px) center, calc(100% - 11px) center;
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
-}
-
-.topbar__theme-select:hover {
-  border-color: var(--cabinet-accent);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12);
-}
-
-.topbar__theme-select:active {
-  transform: translateY(1px);
-}
-
-.topbar__theme-select:focus-visible {
-  outline: 2px solid var(--cabinet-accent);
-  outline-offset: 2px;
-}
-
-/* Below ~480px (roughly where .app itself stops having room to breathe), "OCTAVE SPIN
-   FORGE" alongside the theme select has nowhere near enough width — the select was
-   measured shrinking to ~44px, showing only its dropdown arrow. Narrow viewports have
-   vertical room to spare (confirmed: Spin still sits well above the fold at 375x812
-   with this wrap active), so trade a little of that for a second row instead of
-   letting the title crush the select horizontally. */
-@media (max-width: 480px) {
-  .topbar {
-    flex-wrap: wrap;
-    row-gap: 6px;
-  }
-
-  .topbar__theme {
-    flex-basis: 100%;
-    justify-content: flex-start;
-  }
-}
-
-/* ---------- Audio dock (floating: Master Mute + music fader) ---------- */
+/* ---------- Audio dock (floating: Master Mute, music fader, theme select) ---------- */
 /* Deliberately outside the .app document flow — like the Signal Monitor panel it
    mirrors (opposite corner), it costs zero vertical layout space, which is what
    actually gets the Spin button back above the fold. Icon-only Master Mute (no text
    label) to stay compact as a pill; aria-label carries the accessible name instead. */
+/* Column of 2 independently-sized rows (Master Mute + fader, then the theme select)
+   rather than a single wrapping flex row: a wrapping flex row's own shrink-to-fit
+   width is computed as if every item sat on one unwrapped line (a real flexbox
+   quirk), which stretched this container — and centered the shorter theme row's
+   content inside all that leftover space — to as wide as both rows combined would be
+   side by side, wide enough to overlap .audio-profiler on narrow viewports. A column
+   container sizes to its widest *row* only, each row measured independently. */
 .audio-dock {
   position: fixed;
   left: 16px;
   bottom: 16px;
   z-index: 250;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 6px;
   padding: 8px;
   background: rgba(10, 11, 15, 0.72);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--panel-border);
-  border-radius: 999px;
+  border-radius: 20px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.audio-dock__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .audio-toggle-btn {
@@ -338,6 +266,67 @@ body {
   filter: grayscale(0.7);
 }
 
+/* Theme select, moved into the dock alongside Master Mute/the fader — same pill
+   shape as .audio-fader, but its own row below them (.audio-dock is a column of 2
+   rows, see above) since a "THEME:" text label needs more horizontal room than the
+   icon-only treatment the other two pills use. The label is visual-only
+   (aria-hidden) — the <select>'s own aria-label still carries the accessible name. */
+.audio-dock__theme {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
+}
+
+.audio-dock__theme-label {
+  font-family: "Courier New", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.audio-dock__theme-select {
+  appearance: none;
+  max-width: 140px;
+  min-width: 0;
+  background: transparent;
+  color: var(--text-light);
+  border: none;
+  padding: 0 16px 0 0;
+  font-size: 0.78rem;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: calc(100% - 6px) center, calc(100% - 1px) center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.audio-dock__theme-select:focus-visible {
+  outline: 2px solid var(--cabinet-accent);
+  outline-offset: 2px;
+}
+
+/* The theme row's full-width label + wider select (140px) make .audio-dock noticeably
+   wider than it used to be as a 2-pill dock — fine at desktop widths, but on narrow
+   viewports .audio-dock (bottom-left) and .audio-profiler (bottom-right, fixed
+   independently) are close enough together that the wider dock genuinely overlaps it
+   (see gotcha #10 in ARCHITECTURE.md). Shrinking the select back down on narrow
+   viewports keeps the dock's shrink-to-fit width under the profiler's left edge. */
+@media (max-width: 600px) {
+  .audio-dock__theme-select {
+    max-width: 70px;
+  }
+}
+
 /* ---------- Cabinet ---------- */
 
 .cabinet {
@@ -345,9 +334,9 @@ body {
   justify-content: center;
 }
 
-/* Flat terminal-style panel — same tokens as the topbar/startup terminal, not the
-   bevelled "brushed metal" chrome this used to have. Radius/shadow/border all match
-   the rest of the app now instead of the cabinet being its own distinct design. */
+/* Flat terminal-style panel — same tokens as the startup terminal, not the bevelled
+   "brushed metal" chrome this used to have. Radius/shadow/border all match the rest of
+   the app now instead of the cabinet being its own distinct design. */
 .cabinet__frame {
   width: 100%;
   /* Bottom padding is deliberately larger than the other three sides — the Spin
@@ -365,6 +354,18 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* The app's name, now part of the cabinet itself rather than a separate bordered
+   topbar above it — centered over the reels, first child in the frame's own flex
+   column so the existing 8px gap handles spacing down to .cabinet__glass for free. */
+.cabinet__title {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 1.05rem;
+  letter-spacing: 0.14em;
+  color: var(--cabinet-accent);
+  text-shadow: 0 0 10px rgba(212, 175, 55, 0.35);
 }
 
 /* Powerbet armed: persistent high-energy glow on the whole cabinet, not just the
@@ -1232,7 +1233,15 @@ body {
 /* ---------- Powerbet toggle ---------- */
 /* Occupies the same 74px kickplate column the old spacer held, keeping Spin centered.
    A real button (not a checkbox switch like Fast) since on/off need their own distinct
-   powerBetOn/powerBetOff sfx rather than the generic data-sfx-click uiClick. */
+   powerBetOn/powerBetOff sfx rather than the generic data-sfx-click uiClick.
+
+   Brushed aluminum (Step 14): a fine repeating-linear-gradient brush-stroke texture
+   layered over a light-to-dark metallic sheen — same technique as .spin-btn below,
+   neutral silver instead of gold. The "0 Npx 0 <shadow-color>" box-shadow layer is the
+   physical "thickness" of the button; :active shrinks that offset (button sinks into
+   its socket) rather than just fading anything, which is what actually sells the
+   mechanical-press feel. --powerbet-accent shows up only as an armed-state ring/glow
+   on top of this base material, never as the material itself. */
 .powerbet-toggle {
   display: flex;
   flex-direction: column;
@@ -1241,18 +1250,30 @@ body {
   gap: 4px;
   width: 74px;
   padding: 8px 4px;
-  border: 1px solid var(--control-border);
+  border: 1px solid var(--metal-shadow);
   border-radius: 10px;
-  background: var(--control-bg);
+  background:
+    repeating-linear-gradient(
+      95deg,
+      rgba(255, 255, 255, 0.08) 0px,
+      rgba(255, 255, 255, 0.08) 1px,
+      rgba(0, 0, 0, 0.06) 1px,
+      rgba(0, 0, 0, 0.06) 2px
+    ),
+    linear-gradient(165deg, var(--metal-light) 0%, var(--metal-mid) 35%, var(--metal-dark) 70%, var(--metal-shadow) 100%);
+  box-shadow:
+    0 5px 0 var(--metal-shadow),
+    0 9px 14px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.45);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease,
-    transform 0.05s ease;
+  transition: border-color 0.15s ease, box-shadow 0.06s ease, transform 0.06s ease;
 }
 
 .powerbet-toggle__icon {
   font-size: 1rem;
   line-height: 1;
-  filter: grayscale(1) brightness(1.6);
+  filter: grayscale(1) brightness(0.5);
 }
 
 .powerbet-toggle__label {
@@ -1260,7 +1281,8 @@ body {
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: #1c1c1e;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
   white-space: nowrap;
 }
 
@@ -1268,8 +1290,15 @@ body {
   border-color: var(--powerbet-accent);
 }
 
+/* Physically depresses: translateY + the shadow's own offset/blur shrink to match,
+   not just the button moving while a fixed shadow floats underneath it. */
 .powerbet-toggle:active {
-  transform: translateY(1px);
+  transform: translateY(4px);
+  box-shadow:
+    0 1px 0 var(--metal-shadow),
+    0 3px 6px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.45);
 }
 
 .powerbet-toggle:focus-visible {
@@ -1282,11 +1311,12 @@ body {
   opacity: 0.5;
 }
 
-/* Armed: high-energy, persistently pulsing — deliberately the app's one non-gold
-   accent color so it reads as a distinct mode, not just another "win" highlight. */
+/* Armed: the metal itself doesn't change (still the same brushed aluminum), a
+   high-energy pulsing ring layers on top of the existing shadow stack instead of
+   replacing it — losing the metal shadows mid-pulse would flatten the button back to
+   looking like a plastic badge for half of every animation cycle. */
 .powerbet-toggle--active {
   border-color: var(--powerbet-accent);
-  background: rgba(255, 92, 61, 0.16);
   animation: powerbet-toggle-pulse 1s ease-in-out infinite;
 }
 
@@ -1296,14 +1326,25 @@ body {
 
 .powerbet-toggle--active .powerbet-toggle__label {
   color: var(--powerbet-accent);
+  text-shadow: none;
 }
 
 @keyframes powerbet-toggle-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(255, 92, 61, 0.55);
+    box-shadow:
+      0 5px 0 var(--metal-shadow),
+      0 9px 14px rgba(0, 0, 0, 0.5),
+      inset 0 1px 1px rgba(255, 255, 255, 0.4),
+      inset 0 -3px 5px rgba(0, 0, 0, 0.45),
+      0 0 0 0 rgba(255, 92, 61, 0.55);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(255, 92, 61, 0);
+    box-shadow:
+      0 5px 0 var(--metal-shadow),
+      0 9px 14px rgba(0, 0, 0, 0.5),
+      inset 0 1px 1px rgba(255, 255, 255, 0.4),
+      inset 0 -3px 5px rgba(0, 0, 0, 0.45),
+      0 0 0 8px rgba(255, 92, 61, 0);
   }
 }
 
@@ -1325,13 +1366,18 @@ body {
   opacity: 0;
 }
 
+/* Recessed metal channel — inset shadow (not a drop shadow) so the track itself reads
+   as a groove cut into the kickplate, distinct from the raised buttons either side of
+   it. The thumb is a small brushed-aluminum puck sliding inside it: same light-to-dark
+   sheen + bevel technique as .spin-btn/.powerbet-toggle, just scaled down. */
 .fast-toggle__track {
   position: relative;
   width: 42px;
   height: 22px;
-  background: #1c1e24;
-  border: 1px solid #454851;
+  background: linear-gradient(180deg, #17181a 0%, #0b0b0d 100%);
+  border: 1px solid #050506;
   border-radius: 999px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.85), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
   transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1342,26 +1388,41 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--text-dim);
-  transition: transform 0.15s ease, background 0.15s ease;
+  background: linear-gradient(165deg, var(--metal-hi) 0%, var(--metal-light) 35%, var(--metal-mid) 70%, var(--metal-dark) 100%);
+  box-shadow:
+    0 2px 3px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.06s ease;
 }
 
 .fast-toggle input:checked + .fast-toggle__track {
-  background: rgba(212, 175, 55, 0.25);
-  border-color: var(--cabinet-accent);
+  background: linear-gradient(180deg, #241f0c 0%, #171304 100%);
+  border-color: rgba(212, 175, 55, 0.5);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75), 0 0 8px rgba(212, 175, 55, 0.3);
 }
 
 .fast-toggle input:checked + .fast-toggle__track .fast-toggle__thumb {
   transform: translateX(20px);
-  background: var(--cabinet-accent);
+  background: linear-gradient(165deg, #fdeeb0 0%, #e8c766 35%, var(--cabinet-accent) 70%, #8a6b16 100%);
 }
 
 .fast-toggle:hover .fast-toggle__track {
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12);
+  border-color: rgba(212, 175, 55, 0.5);
 }
 
+/* Physical press: the thumb itself compresses toward the channel (shrinks + its own
+   shadow flattens), on top of the existing whole-track scale-down — reads as the puck
+   actually being pressed into its groove, not just the control shrinking uniformly. */
 .fast-toggle input:active + .fast-toggle__track {
-  transform: scale(0.94);
+  transform: scale(0.96);
+}
+
+.fast-toggle input:active + .fast-toggle__track .fast-toggle__thumb {
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.3);
 }
 
 .fast-toggle__label {
@@ -1371,34 +1432,54 @@ body {
   color: var(--text-dim);
 }
 
+/* Gold-anodized brushed aluminum (Step 14) — the biggest, heaviest application of the
+   same material as .powerbet-toggle/.fast-toggle__thumb, which is what actually keeps
+   Spin the most prominent control (size + shadow weight), not a different material.
+   The old radial "glossy candy" gradient read as plastic; a directional linear sheen +
+   brush texture + real bevel reads as cast/machined metal instead. */
 .spin-btn {
   width: 108px;
   height: 108px;
   border-radius: 50%;
-  border: none;
+  border: 1px solid #4a3a0c;
   cursor: pointer;
   font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: 0.1em;
-  color: #241a02;
-  background: radial-gradient(circle at 35% 30%, #f6d97a, var(--cabinet-accent) 60%, #a3821f 100%);
+  color: #2a1f04;
+  background:
+    repeating-linear-gradient(
+      95deg,
+      rgba(255, 255, 255, 0.12) 0px,
+      rgba(255, 255, 255, 0.12) 1px,
+      rgba(0, 0, 0, 0.06) 1px,
+      rgba(0, 0, 0, 0.06) 2px
+    ),
+    linear-gradient(160deg, #fdeeb0 0%, #e8c766 22%, var(--cabinet-accent) 50%, #a67f1b 74%, #7a5e12 100%);
   box-shadow:
-    0 8px 0 #7a611a,
-    0 12px 18px rgba(0, 0, 0, 0.5),
-    inset 0 2px 4px rgba(255, 255, 255, 0.5);
+    0 8px 0 #6b5417,
+    0 14px 22px rgba(0, 0, 0, 0.55),
+    inset 0 2px 1px rgba(255, 255, 255, 0.8),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(255, 236, 168, 0.35);
   transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.15s ease;
 }
 
 .spin-btn:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.06);
 }
 
+/* Physically depresses: the "0 8px 0" solid shadow layer (the button's own visible
+   thickness) shrinks to "0 2px 0" in lockstep with the translateY, so the cap reads as
+   sinking into its socket by exactly the amount it moves — not floating above a shadow
+   that stayed put. */
 .spin-btn:active {
   transform: translateY(6px);
   box-shadow:
-    0 2px 0 #7a611a,
+    0 2px 0 #6b5417,
     0 4px 10px rgba(0, 0, 0, 0.5),
-    inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    inset 0 2px 1px rgba(255, 255, 255, 0.65),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.35);
 }
 
 .spin-btn:focus-visible {

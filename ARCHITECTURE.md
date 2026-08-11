@@ -6,10 +6,18 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 13
-(the debug "Force Big Win" button is gone — forcing a blackout is now a real, prominent
-"Powerbet" toggle on the cabinet itself, with a persistent high-energy glow while armed and an
-auto-reset once the win is fully collected — see "Powerbet (Step 13)" below). Before that: Step 11
+Read this file first in any new session on this project. It reflects the state after Step 15
+(the standalone `.topbar` panel is gone entirely — the "OCTAVE SPIN FORGE" title moved into
+`.cabinet__frame` as `.cabinet__title`, centered above the reels, and the theme `<select>` moved
+into the floating `#audio-dock` alongside Master Mute and the music fader, as a third dock pill;
+see "Title relocation & theme select → dock (Step 15)" below). Before that: Step 14 (Spin,
+Powerbet, and Fast/Slow all now share one "brushed anodized aluminum" material —
+directional metallic gradients, a brush-stroke texture layer, real inset bevels, and shadows that
+physically compress on `:active` — replacing Spin's old glossy radial-gradient "candy button" look
+and Powerbet/Fast's flat panel styling; see "Brushed aluminum material (Step 14)" below). Before
+that: Step 13 (the debug "Force Big Win" button is gone — forcing a blackout is now a real,
+prominent "Powerbet" toggle on the cabinet itself, with a persistent high-energy glow while armed
+and an auto-reset once the win is fully collected — see "Powerbet (Step 13)" below). Before that: Step 11
 (landed chronologically *after* Step 12 below — the user numbered it that way, it's not a doc
 error): `musicMain` now starts alongside `gameStart` with a 2000ms fade-in instead of waiting for
 it to finish, and Scatter was stripped of all special behavior and folded into the standard
@@ -431,6 +439,117 @@ the gotcha below if this regresses.
 
 ---
 
+## Brushed aluminum material (Step 14)
+
+Spin (`.spin-btn`), Powerbet (`.powerbet-toggle`), and the Fast/Slow toggle's thumb
+(`.fast-toggle__thumb`) now share one physical-hardware material — "brushed anodized aluminum" —
+instead of each having its own ad hoc styling (Spin's old glossy radial-gradient "candy button"
+look, Powerbet's flat single-color panel, Fast's flat circle thumb). The goal was heavy cast/
+machined metal, explicitly *not* plastic.
+
+**The technique, identical across all three (just re-scaled per control):**
+```css
+background:
+  repeating-linear-gradient(95deg, rgba(255,255,255,X) 0px, rgba(255,255,255,X) 1px,
+    rgba(0,0,0,X) 1px, rgba(0,0,0,X) 2px),   /* brush-stroke texture, ~1-2px stripes */
+  linear-gradient(160-165deg, <light> 0%, <mid> ~35-50%, <dark> ~70%, <shadow> 100%);
+                                              /* directional metallic sheen, lit from
+                                                 upper-left, cast toward lower-right */
+box-shadow:
+  0 Npx 0 <shadow-color>,                    /* solid "thickness" — the button's own
+                                                 physical depth, not a blur */
+  0 Mpx Xpx rgba(0,0,0,0.5),                 /* soft ambient lift off the panel behind it */
+  inset 0 1-2px 1px rgba(255,255,255,0.3-0.8),  /* top bevel highlight */
+  inset 0 -2 to -4px 4-8px rgba(0,0,0,0.35-0.45); /* bottom bevel shadow */
+```
+Two independent palettes reuse this same structure: `--metal-hi/light/mid/dark/shadow` (neutral
+silver — `:root`, Step 14) for Powerbet and the Fast toggle; gold stops built from
+`--cabinet-accent` (`#fdeeb0 → #e8c766 → --cabinet-accent → #a67f1b → #7a5e12`) for Spin, so it
+stays the visually dominant control through size (108px) and shadow weight, not by being a
+different material — "same DNA, different scale," per the brief.
+
+**The `:active` "physical depress" pattern — the part that actually sells the mechanical feel:**
+the solid `0 Npx 0 <shadow-color>` shadow layer is shrunk in lockstep with the `translateY()`
+(e.g. Spin: `translateY(6px)` pairs with `0 8px 0` → `0 2px 0`), so the button visually sinks into
+its own socket by exactly the distance it moved, instead of just translating while a shadow stays
+put underneath it (which reads as the button floating, not pressing). The soft ambient shadow's
+blur/spread shrinks too, and the top bevel highlight dims slightly (light has less of an edge to
+catch once the button is recessed). Fast's thumb gets the same treatment scaled down (its own
+mini shadow flattens on `:active`) in addition to the existing whole-track `scale(0.96)`.
+
+**Powerbet's armed state (`.powerbet-toggle--active`, pulsing `--powerbet-accent` glow) keeps the
+full metal shadow stack present in *every* keyframe of `@keyframes powerbet-toggle-pulse`** — only
+the outer glow ring's spread animates (`0 0 0 0` ↔ `0 0 0 8px`), layered on top of, never
+replacing, the base material's shadows. The first version of this (Step 13) used a keyframe that
+only declared the glow ring, which would have gone through the base `box-shadow` property and
+wiped out the metal shadows for half of every pulse cycle the moment Step 14's real shadow stack
+landed — worth remembering if any other pulsing/glowing state ever gets added to a metal control:
+**animated `box-shadow` keyframes must restate every layer that should stay visible, not just the
+one that's actually animating.**
+
+Fast's track (`.fast-toggle__track`) is deliberately *not* part of the raised-metal family — it's
+styled as a recessed groove (`inset` shadow only, dark gradient) that the aluminum thumb slides
+inside, giving the kickplate a mix of raised (Spin, Powerbet, the thumb) and recessed (the track
+itself) elements, same as a real hardware panel would have.
+
+`.big-win-collect-btn` still uses the old pre-Step-14 gold radial-gradient styling — out of scope
+for this pass (the brief named Spin/Powerbet/Fast-Slow specifically), so it now looks visually
+inconsistent with `.spin-btn` if you look closely. Worth unifying in a future pass, not done here.
+
+---
+
+## Title relocation & theme select → dock (Step 15)
+
+**What changed:** `<header class="topbar">` — the last surviving piece of the pre-Step-10 header
+concept — is gone from `index.html` entirely, along with all its CSS (`.topbar`, `.topbar__title`,
+`.topbar__theme*`, and the `@media (max-width: 480px)` wrap rule described in "Visual system &
+layout (Step 10)" above). Two things it used to hold moved to new homes:
+- **The title** is now `<h1 class="cabinet__title">OCTAVE&nbsp;SPIN&nbsp;FORGE</h1>`, the first
+  child of `.cabinet__frame`, centered above `.cabinet__glass` (the reels). It's inside the
+  cabinet panel now, not a separate panel of its own above it.
+- **The theme `<select>`** moved into `#audio-dock` as `.audio-dock__theme`, on its own row below
+  Master Mute and the music fader, preceded by a visible `THEME:` text label
+  (`.audio-dock__theme-label`, monospace, same uppercase/letter-spaced treatment as
+  `.win-counter__label`) rather than an icon — a follow-up refinement after the first pass put it
+  inline as a third icon-only pill; the label needed more horizontal room than that shape gave it.
+  Nothing about its JS wiring changed either time: it's still `#theme-select`, still populated by
+  `populateThemeSelect()` and driven by `wireThemeSelect()` in `main.js`, both of which look it up
+  by id, not by DOM position.
+
+**Why this is safe:** every piece of JS that touches these two elements does so by `id`
+(`#theme-select`) or by creating the title fresh — nothing in `main.js` queried `.topbar` or a
+child selector scoped to it, so moving both elements required zero JS changes, confirmed by
+`grep`.
+
+**`#audio-dock` is now a 2-row column** (`display: flex; flex-direction: column`), not a single
+row: `.audio-dock__row` wraps Master Mute + the fader as row 1, `.audio-dock__theme` is row 2.
+This replaced an earlier single-row `flex-wrap: wrap` attempt that looked right on wide desktop
+viewports but broke on mobile — worth understanding why, since it's a real flexbox trap:
+
+**The `flex-wrap` trap (found and fixed in this same step):** with all 3 controls as direct
+children of a single wrapping flex row, `.audio-dock`'s own shrink-to-fit width was computed as if
+*all three sat on one unwrapped line* — a real CSS flexbox intrinsic-sizing rule, not a bug in this
+code — even though the theme control (with its longer label + wider select) was actually wrapping
+onto its own line beneath the other two. The container ended up as wide as "mute + fader + theme"
+side by side, with the wrapped theme row then centered inside all that leftover horizontal space.
+At the ~846px desktop test width there was enough clearance that this went unnoticed; at 375px
+mobile the resulting ~350px-wide dock genuinely overlapped `.audio-profiler` (bottom-right, ~30px
+of real intersection measured via `getBoundingClientRect()` on both). **Fixed by giving row 1 its
+own explicit flex container** (`.audio-dock__row`) and making `.audio-dock` itself
+`flex-direction: column` — a column container's shrink-to-fit width is just the widest *row*,
+each measured independently, with no cross-row summing quirk to trigger. If another control ever
+gets added to this dock, keep it inside a `.audio-dock__row` (new or existing) rather than adding
+a 4th direct child expecting a wrapping row to lay it out — this exact trap will resurface
+otherwise.
+
+**`.audio-dock__theme-select` still truncates long labels** — `max-width: 140px` normally, dropped
+to `70px` under a `@media (max-width: 600px)` rule (matching the breakpoint gotcha #10 already
+uses) so the now-narrower mobile dock doesn't get pulled wide again by the select alone. Same
+`text-overflow: ellipsis; white-space: nowrap; overflow: hidden;` truncation pattern as gotcha #6
+— "Vintage Arcade" reads in full on desktop, truncates to "Vintag…" on narrow viewports.
+
+---
+
 ## Theme switching / visual transition
 
 Both `ThemeTransition.swapTo(themeName)` (in-game dropdown) and `enterFromTerminal(themeName,
@@ -557,11 +676,11 @@ drives the transition; nothing about the sfx wiring touches the gate itself, sin
 is a distinct, always-loaded Howl bank from the thematic one (`themeAudio`) that stays gated
 until a theme is actually chosen.
 
-`#theme-select` (the in-game dropdown — back inside the topbar itself as of Step 10, in
-`.topbar__theme`; see "Visual system & layout (Step 10)" below for why it moved twice) is
-populated at runtime from the same `THEMES` registry (`populateThemeSelect()` in `main.js`)
-rather than hardcoded `<option>` tags in the HTML — so both the terminal and the dropdown always
-agree on what themes exist, from one array.
+`#theme-select` (the in-game dropdown — inside the floating `#audio-dock` as of Step 15, in
+`.audio-dock__theme`; see "Title relocation & theme select → dock (Step 15)" above for its full
+move history) is populated at runtime from the same `THEMES` registry (`populateThemeSelect()` in
+`main.js`) rather than hardcoded `<option>` tags in the HTML — so both the terminal and the
+dropdown always agree on what themes exist, from one array.
 
 ---
 
@@ -588,7 +707,9 @@ automatically gets the sound, no per-element wiring needed. Whole bank plays at 
 **Master Mute + a music volume fader**, both in the floating `#audio-dock` as of Step 10
 (`#master-mute-btn`, `#music-fader-wrap` > `#music-fader` — see "Visual system & layout (Step 10)"
 for why they left the topbar; state still lives in `main.js`'s `wireAudioControls()`, not
-persisted anywhere, and none of the ids/JS wiring changed, only where they sit in the DOM):
+persisted anywhere, and none of the ids/JS wiring changed, only where they sit in the DOM). The
+dock gained a second row, the theme select, in Step 15 — see "Title relocation & theme select →
+dock (Step 15)" above:
 - **Master Mute** = `Howler.mute(bool)`, the static/global method — silences *everything*,
   every Howl instance, automatically, no per-instance code needed.
 - **Music fader** (Step 8; replaced the old "Music Mute" toggle button) = a `<input type="range"
@@ -698,7 +819,10 @@ explicitly (win counter, result readout, etc.) still do, redundantly but harmles
 metal gradient + heavy inset bevels. **The Spin button (and the Big Win collect button) were
 deliberately left alone** — still the dimensional radial-gradient/drop-shadow/press-animation
 treatment — as an intentional accent against the now-flatter frame, an explicit choice (not an
-oversight) made when this was scoped out with the user before implementation.
+oversight) made when this was scoped out with the user before implementation. (Superseded for
+Spin by Step 14's brushed-aluminum pass, below — Spin's radial gradient became a directional
+metallic one, though the "stay dimensional against the flatter frame" reasoning still holds.
+`.big-win-collect-btn` is the one place that old radial-gradient treatment still lives.)
 
 **Layout — three options were prototyped as ASCII wireframes and reviewed before any code was
 written** (a consolidated single-row header; a permanent side rail à la a DAW inspector; a
@@ -866,6 +990,11 @@ floating dock). **The floating dock was chosen.** What that means concretely:
    this only ever affected the very first static reveal.)
 10. **The two `position: fixed`, viewport-anchored corner panels (`.audio-dock` bottom-left,
     `.audio-profiler` "Signal Monitor" bottom-right) can silently overlap real cabinet content**
+    (as of Step 15, `.audio-dock` is a 2-row column — Master Mute + fader on row 1, the theme
+    select on row 2 — sized to its widest row, ~167px at mobile widths, comfortably clear of
+    `.audio-profiler`; an earlier same-step attempt at a single wrapping row measured ~350px wide
+    on mobile and did overlap, see "Title relocation & theme select → dock (Step 15)" above for
+    why a wrapping flex row is the wrong tool for this and what replaced it)
     — neither panel's position accounts for `.app`'s or `.cabinet__frame`'s actual edges in any
     way (they're anchored to the *viewport*). Two distinct instances of this hit in practice:
     - **Desktop/horizontal** (~846px test viewport): `.app`'s 480px max-width plus both panels'
