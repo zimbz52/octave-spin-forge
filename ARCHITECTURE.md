@@ -6,7 +6,19 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 19
+Read this file first in any new session on this project. It reflects the state after Step 21
+(arcadeSounds.json was refreshed from the source, same as Egypt — this time with `mainMusic`
+instead of `musicMain` again, plus a new naming variant: `powerbetOn`/`powerbetOff`, lowercase
+"b", instead of `powerBetOn`/`powerBetOff`. Per the Step 19 policy, asked before touching
+anything; both were confirmed as oversights and renamed directly in the JSON (both the project
+copy and the Drive source file), same treatment as every prior naming fix. See "Refreshing
+arcadeSounds.json (Step 21)" below). Before that: Step 20
+(egyptSounds.json was refreshed from the source — Egypt now defines `powerBetOn`/`powerBetOff`
+and `winSymbol04` directly like China/Neon Drive, no longer needs the legacy `winSymbolScatter`
+fallback. The new file also briefly had 4 big-win-intro takes — `winBigT1`, `winBigT12`,
+`winBigT2`, `winBigT4` — where only one existed before; per explicit direction, 3 were deleted
+and the kept one (`winBigT4`'s audio) was renamed to the expected `winBigT1`, not wired up as a
+4th random-pick pool. See "Refreshing egyptSounds.json (Step 20)" below). Before that: Step 19
 (the naming-fallback mechanisms built in Steps 17-18 — `_musicSpriteName()`'s musicMain/mainMusic
 fallback, and `_randomAvailableIndexedName()`'s priority-ordered-prefix-list form for
 winSmall/smallWin — were both **removed**, and the two JSON files that motivated them were
@@ -837,6 +849,57 @@ a live small-win spin, via the plain non-fallback path this time), `busRouting.j
 `getBusForSprite("smallWin01")` and `getBusForSprite("mainMusic")` both now return `null` (neither
 name is routed, matching that no bank uses them anymore), and Egypt/China both regression-checked
 clean.
+
+---
+
+## Refreshing egyptSounds.json (Step 20)
+
+`egyptSounds.json`/`.mp3` were re-copied from the source (byte-for-byte per rule #4, both the
+project's copy and the original file in the Drive sync folder). Two things changed:
+
+**Egypt caught up to the modern convention.** It now defines `powerBetOn`/`powerBetOff` (China/
+Neon Drive already did; Mexico/Arcade/Football still don't) and `winSymbol04` directly (previously
+Egypt was one of the banks still on the legacy `winSymbolScatter` name — see "Scatter removal
+(Step 11)"). No code changes needed either way; both are picked up automatically by the existing
+`_spriteNames.has(...)` guards, exactly as designed.
+
+**The new file also briefly had 4 big-win-intro takes instead of 1** — `playBigWinIntro()` plays a
+single one-shot, `winBigT1`, the instant the Grand Win overlay appears. The refreshed JSON arrived
+with `winBigT1`, `winBigT12`, `winBigT2`, and `winBigT4` all present, numbered irregularly (not a
+clean `01`-`04` pattern like every other multi-variant sprite family in this project). **This was
+not treated as "another variant-count case for `_randomAvailableIndexedName()`"** — unlike
+`winSmall01-04`/`reelStart01-05`/etc., `winBigT*` was never meant to be a random-pick pool; the
+irregular numbering itself was a signal something was off, not a naming convention to generalize
+for. Asked the user directly rather than guessing (per the Step 19 policy) — answer: keep only the
+`winBigT4` take, rename it to `winBigT1`, delete the other three entries. Done directly in the
+JSON (both copies, same as the `mainMusic`/`smallWin` fixes) — `ThemeAudio.js`'s
+`playBigWinIntro()` needed no code change, since the sprite it already calls (`winBigT1`) just now
+points at different audio (start `154s`, the former `winBigT4`'s offset) instead of the original
+take. Verified live: `howl._sprite.winBigT1` reports `[154000, 3226]` (matching the kept take's
+original offset/duration exactly), and a real forced Grand Win fired `winBigT1` correctly in
+sequence (`winSymbol03` → `winBigT1` → `winBigRiser` → `winBigRiserEnd`).
+
+---
+
+## Refreshing arcadeSounds.json (Step 21)
+
+Same source-refresh pattern as Egypt (Step 20), a second naming oversight this time instead of a
+new-content ambiguity. Per the Step 19 policy, asked before changing anything rather than fixing
+or working around either silently.
+
+- **`mainMusic` instead of `musicMain`.** The exact same mistake-shape China originally had (Step
+  17) — not a new fallback, just the same direct-rename treatment: `musicMain` in both the
+  project's copy and the original file in the Drive sync folder.
+- **`powerbetOn`/`powerbetOff` instead of `powerBetOn`/`powerBetOff`.** A naming variant not seen
+  before — lowercase "b" in "bet" rather than a word-order swap. Same treatment: renamed to the
+  capitalized form the code actually checks for (`_spriteNames.has("powerBetOn")` etc.), in both
+  file locations.
+
+No `ThemeAudio.js` or `busRouting.js` changes of any kind — both fixes are exact-name corrections
+to sprites the code already expects, not new naming *patterns* to account for. Verified live:
+Arcade's music plays under `musicMain` (`mainMusic`/lowercase-`powerbet*` confirmed absent from
+`_spriteNames`), and a real Powerbet toggle on/off correctly played `powerBetOn` then
+`powerBetOff`.
 
 ---
 

@@ -18,138 +18,148 @@
       "duration": 57.6
     },
     {
-      "name": "reelStart01",
+      "name": "powerBetOff",
       "start": 90,
+      "duration": 1.701
+    },
+    {
+      "name": "powerBetOn",
+      "start": 92,
+      "duration": 2.542
+    },
+    {
+      "name": "reelStart01",
+      "start": 95,
       "duration": 1.326
     },
     {
       "name": "reelStart02",
-      "start": 92,
+      "start": 97,
       "duration": 1.32
     },
     {
       "name": "reelStart03",
-      "start": 94,
+      "start": 99,
       "duration": 1.459
     },
     {
       "name": "reelStart04",
-      "start": 96,
+      "start": 101,
       "duration": 1.321
     },
     {
       "name": "reelStart05",
-      "start": 98,
+      "start": 103,
       "duration": 1.305
     },
     {
       "name": "reelStop01",
-      "start": 100,
+      "start": 105,
       "duration": 0.299
     },
     {
       "name": "reelStop02",
-      "start": 101,
+      "start": 106,
       "duration": 0.271
     },
     {
       "name": "reelStop03",
-      "start": 102,
+      "start": 107,
       "duration": 0.3
     },
     {
       "name": "reelStop04",
-      "start": 103,
+      "start": 108,
       "duration": 0.301
     },
     {
       "name": "reelStop05",
-      "start": 104,
+      "start": 109,
       "duration": 0.298
     },
     {
       "name": "reelTurbo01",
-      "start": 105,
+      "start": 110,
       "duration": 0.646
     },
     {
       "name": "reelTurbo02",
-      "start": 106,
+      "start": 111,
       "duration": 0.616
     },
     {
       "name": "reelTurbo03",
-      "start": 107,
+      "start": 112,
       "duration": 0.636
     },
     {
       "name": "reelTurbo04",
-      "start": 108,
+      "start": 113,
       "duration": 0.562
     },
     {
       "name": "reelTurbo05",
-      "start": 109,
+      "start": 114,
       "duration": 0.68
     },
     {
       "name": "winBigRiser",
-      "start": 110,
+      "start": 115,
       "duration": 24.073
     },
     {
       "name": "winBigRiserEnd",
-      "start": 135,
+      "start": 140,
       "duration": 2.735
     },
     {
       "name": "winBigT1",
-      "start": 138,
+      "start": 154,
       "duration": 3.226
     },
     {
       "name": "winSmall01",
-      "start": 142,
+      "start": 158,
       "duration": 1.516
     },
     {
       "name": "winSmall02",
-      "start": 144,
-      "duration": 1.515
+      "start": 160,
+      "duration": 1.588
     },
     {
       "name": "winSmall03",
-      "start": 146,
-      "duration": 1.501
+      "start": 162,
+      "duration": 1.621
     },
     {
       "name": "winSmall04",
-      "start": 148,
-      "duration": 1.565
+      "start": 164,
+      "duration": 1.77
     },
     {
       "name": "winSymbol01",
-      "start": 150,
-      "duration": 1.529
+      "start": 166,
+      "duration": 1.807
     },
     {
       "name": "winSymbol02",
-      "start": 152,
+      "start": 168,
       "duration": 1.807
     },
     {
       "name": "winSymbol03",
-      "start": 154,
-      "duration": 1.55
+      "start": 170,
+      "duration": 1.359
     },
     {
-      "name": "winSymbolScatter",
-      "start": 156,
-      "duration": 1.807
+      "name": "winSymbol04",
+      "start": 172,
+      "duration": 1.547
     },
     {
       "name": "winSymbolWild",
-      "start": 158,
+      "start": 174,
       "duration": 1.81
     }
   ]
