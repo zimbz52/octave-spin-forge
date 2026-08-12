@@ -6,11 +6,11 @@
     "asset": "assets/themes/neondrive/background.jpg"
   },
   "symbols": {
-    "symbol01": "assets/themes/neondrive/symbol01.svg",
-    "symbol02": "assets/themes/neondrive/symbol02.svg",
-    "symbol03": "assets/themes/neondrive/symbol03.svg",
-    "symbol04": "assets/themes/neondrive/symbol04.svg",
-    "wild": "assets/themes/neondrive/wild.svg"
+    "symbol01": "assets/themes/neondrive/neondrive-01-blue-martini.svg",
+    "symbol02": "assets/themes/neondrive/neondrive-02-green-f1-car.svg",
+    "symbol03": "assets/themes/neondrive/neondrive-03-coral-cassette.svg",
+    "symbol04": "assets/themes/neondrive/neondrive-04-purple-money-stack.svg",
+    "wild": "assets/themes/neondrive/neondrive-wild-gold-suitcase.svg"
   },
   "audio": {
     "intro": "assets/audio/neondrive/intro.mp3",

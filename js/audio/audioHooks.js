@@ -59,9 +59,15 @@ export function playThemeSymbolWin(symbolId) {
 }
 
 // Fires the instant the win-line starts sweeping across the reels to connect the
-// winning symbols.
+// winning symbols — i.e. the small line *before* the small-win celebration pop/blink
+// effects begin. Systemic (not per-theme), same as SystemAudio's other UI sounds:
+// a tiny tick, randomly pitched +/-1 semitone by SystemAudio.play() itself, so it
+// doesn't read identically every single small win. "smallWinLineTick" doesn't exist
+// in systemSounds.json yet — safe to call freely, becomes live automatically the
+// moment it's added (see SystemAudio.play()'s own guard).
 export function playWinLineDash() {
   console.log("[audio hook] playWinLineDash()");
+  systemAudio.play("smallWinLineTick");
 }
 
 // Fires the instant the winning symbols start their scale/glow/twitch reaction,
@@ -70,13 +76,51 @@ export function playSymbolPulse() {
   console.log("[audio hook] playSymbolPulse()");
 }
 
+// Fires once the small-win celebration (SymbolCelebration's pop/glow overlay) has
+// fully finished — the audio accent for the 3-iteration .symbol--win blink pulse
+// that's still running on the payline tiles at that point (see the win-pulse
+// keyframes in styles.css). Systemic, same shape as playWinLineDash() above: a tiny
+// tick, randomly pitched per play by SystemAudio.play(), safe to call before
+// "smallWinBlinkTick" exists in systemSounds.json.
+export function playSmallWinBlink() {
+  console.log("[audio hook] playSmallWinBlink()");
+  systemAudio.play("smallWinBlinkTick");
+}
+
+// Small-win money counter: prefers the active theme's own winSmallDigits/
+// winSmallDigitsEnd pair (China defines one; see ThemeAudio.playSmallWinDigits()) and
+// only falls back to the generic systemic pair (SystemAudio.playSmallWinDigits(),
+// same sprite names, different bank) if the active theme doesn't define one.
+// Re-checked on every roll-up rather than cached, so a theme switch mid-session is
+// always evaluated fresh. Neither systemSounds.json's winSmallDigits/winSmallDigitsEnd
+// exist yet — this is the fallback half left ready to go the moment they're added,
+// same as playWinLineDash()/playSmallWinBlink() above.
+let smallWinDigitsUsingSystemFallback = false;
+
+function startSmallWinDigits() {
+  smallWinDigitsUsingSystemFallback = !themeAudio.hasSmallWinDigits();
+  if (smallWinDigitsUsingSystemFallback) {
+    systemAudio.playSmallWinDigits();
+  } else {
+    themeAudio.playSmallWinDigits();
+  }
+}
+
+function stopSmallWinDigits() {
+  if (smallWinDigitsUsingSystemFallback) {
+    systemAudio.stopSmallWinDigits();
+  } else {
+    themeAudio.stopSmallWinDigits();
+  }
+}
+
 // type: "small" or "big". Fires the instant the counter starts ticking up from 0 —
 // the cue to start a looping buildup SFX bed. Big wins additionally start the theme's
 // climax riser at exactly this moment.
 export function startWinRollup(type) {
   console.log(`[audio hook] startWinRollup(type="${type}")`);
   if (type === "big") themeAudio.playBigWinRiser();
-  if (type === "small") themeAudio.playSmallWinDigits();
+  if (type === "small") startSmallWinDigits();
 }
 
 // type: "small" or "big". Fires the instant the counter hits its final amount — the
@@ -92,7 +136,7 @@ export function triggerWinClimax(type) {
 export function stopWinRollup(type) {
   console.log(`[audio hook] stopWinRollup(type="${type}")`);
   if (type === "big") themeAudio.stopBigWinRiser();
-  if (type === "small") themeAudio.stopSmallWinDigits();
+  if (type === "small") stopSmallWinDigits();
 }
 
 // Fires the exact moment the big win overlay screen appears — a one-shot stinger

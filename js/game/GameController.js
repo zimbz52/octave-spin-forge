@@ -10,6 +10,7 @@ import {
   playWinStinger,
   playWinLineDash,
   playSymbolPulse,
+  playSmallWinBlink,
   playThemeSmallWin,
   playThemeSymbolWin,
   playBigWinIntro,
@@ -151,6 +152,11 @@ export class GameController {
         // Wild-assist tier plays both winSymbolWild and winSymbol01 together.
         playThemeSmallWin([...new Set(outcome.payline)]);
         await Promise.all([...paylineEls.map((el) => this.celebration.celebrate(el)), this.winLine.hide()]);
+
+        // Post-celebration: the payline tiles are still mid-blink (.symbol--win's
+        // 3-iteration pulse, see styles.css) at this point — this is the audio accent
+        // for that, fired once the celebration pop itself has finished.
+        playSmallWinBlink();
 
         await this.winCounter.rollUp(outcome.tier.winAmount, SMALL_ROLLUP_MS, "small");
       }

@@ -6,7 +6,29 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 24
+Read this file first in any new session on this project. It reflects the state after Step 27
+(icon *files* now follow an explicit naming convention —
+`assets/themes/<theme>/<theme>-<slot>-<color>-<keyword>.svg`, e.g.
+`assets/themes/egypt/egypt-01-blue-horus.svg` — replacing the old generic `symbol01.svg`/`wild.svg`
+names; every `themes/<id>.json` was updated to match, and the old-named files were deleted, not
+left alongside the new ones. All 6 `wild` icons also gained actual "WILD" text baked into the SVG,
+which Step 26's fresh icon set hadn't included. See "Icon file naming convention + WILD text
+(Step 27)" below). Before that: Step 26
+(every theme's 5 symbol icons were replaced with a new, explicit per-theme icon concept — e.g.
+Egypt's symbol01 is now specifically "ibis bird / Horus" rather than the looser "cobra" guess
+Step 24 shipped with. **This concept table is the canonical, persistent naming convention for
+these icons going forward — see "The per-theme symbol icon convention (Step 26)" below and treat
+it as binding, not a one-time description; it's since been kept current** (Step 27 filled Arcade's
+symbol03 gap with "rocket" and changed Football's symbol01 from "trophy cup" to "gloves"; the
+table below already reflects both)). Before that: Step 25
+(3 small-win audio hooks were prepared — wired, guarded, and structurally complete — but left
+deliberately inert, since none of their sprite names exist in any bank yet: `playWinLineDash()`
+and a new `playSmallWinBlink()` (both systemic, tiny randomized-pitch ticks around the win-line
+dash and the post-celebration blink), and the small-win money counter's start/stop, which now
+prefers a theme's own `winSmallDigits`/`winSmallDigitsEnd` (China has one) and falls back to a
+generic systemic pair of the same name otherwise — all three become live automatically the
+moment their sprites are added, no code changes needed. See "Preparing 3 small-win audio hooks,
+left inert (Step 25)" below). Before that: Step 24
 (symbols got real per-theme icon art — a 2D SVG icon set per theme, 5 icons each, pulled
 dynamically from that theme's JSON `symbols` map, with a graceful fallback to the old CSS-shape
 rendering for any symbol a theme doesn't (yet) provide art for. `.symbol` itself became a plain
@@ -1074,6 +1096,14 @@ climax effects are meant to read as one instantaneous beat, not two).
 
 ## Real per-theme symbol icons (Step 24)
 
+**Historical note (superseded by Step 26 below):** the concept table a few paragraphs down was
+that session's best-effort naming convention, but the user has since provided a different,
+more specific one (new icon art per theme, sourced from `assets/new icons/`) — **Step 26's table
+is the current canonical convention now, not this one.** Kept below for the reasoning trail (why
+some icons were deliberately left unchanged in this pass) and because the SVG plumbing/CSS
+mechanism this section describes is still exactly how icons work; only the *concept-per-slot*
+table is stale.
+
 **What changed:** symbols went from CSS-shape placeholders (clip-path + flat color + a "01"/"WILD"
 text label) to real 2D icon art — 5 hand-authored flat SVG icons per theme (symbol01-04, wild),
 one set per theme in `assets/themes/<name>/`, referenced by `themes/<name>.json`'s `symbols` map
@@ -1234,6 +1264,180 @@ state, so both genuinely go dark when they stop, not just stop animating.
 
 ---
 
+## Preparing 3 small-win audio hooks, left inert (Step 25)
+
+**What this is:** 3 audio hooks for small-win moments, fully wired and structurally complete, but
+producing no sound yet — none of the sprite names involved exist in any bank's JSON. Each becomes
+live automatically the moment the relevant sprite is added, no code changes needed, same
+"generalize, don't special-case" shape as every naming/variant fix in Steps 17-21.
+
+**1. `playWinLineDash()` (existing hook, now wired)** — fires when the win-line starts sweeping
+across the reels, *before* the small-win celebration's pop/blink effects begin ("the small line
+prior to the small win celebration"). Calls `systemAudio.play("smallWinLineTick")` — systemic
+(not per-theme), so it's the same sound across every theme. Pitch randomization is automatic:
+`SystemAudio.play()` already applies `randomizedPitchRate()` (±1 semitone) to every trigger, so
+no new randomization logic was needed here at all — just calling the existing `play()` entry
+point gets it for free.
+
+**2. `playSmallWinBlink()` (new hook)** — fires once the small-win celebration (the
+`SymbolCelebration` pop/glow overlay) has fully resolved. At that point the payline tiles are
+still mid-blink — `.symbol--win`'s 3-iteration pulse (Step 24) is a pure CSS animation running
+independently of this JS-level hook, not something this hook needs to fire 3 times to sync with;
+it's the audio accent for that phase as a whole, fired once. Also systemic, same shape as #1:
+`systemAudio.play("smallWinBlinkTick")`, pitch-randomized automatically. Wired in
+`GameController.js` right after `Promise.all([...celebrate(el), winLine.hide()])` resolves, before
+`winCounter.rollUp()` starts.
+
+**3. Small-win money counter — theme-priority with systemic fallback.** Unlike #1/#2, this isn't
+a single new sprite — it's a *dispatch* decision between two existing shapes:
+`ThemeAudio.playSmallWinDigits()`/`stopSmallWinDigits()` (China already has one, see Step 17's
+"Adding China" section) and new `SystemAudio.playSmallWinDigits()`/`stopSmallWinDigits()`
+(identical sprite names — `winSmallDigits`/`winSmallDigitsEnd` — but in the systemic bank, for
+themes with no custom money-counter sound of their own). `audioHooks.js`'s `startWinRollup`/
+`stopWinRollup("small")` now call new local `startSmallWinDigits()`/`stopSmallWinDigits()`
+wrappers instead of `themeAudio.playSmallWinDigits()` directly: `ThemeAudio.hasSmallWinDigits()`
+(new public method, just `this._spriteNames.has("winSmallDigits")`) is checked fresh on every
+roll-up — theme wins if it has its own pair, systemic bank is used otherwise. A module-level
+`smallWinDigitsUsingSystemFallback` flag (set on start) tells the matching stop call which bank to
+stop, so start/stop always agree even if a theme switch happens mid-flow.
+
+**Why the fallback dispatch lives in `audioHooks.js`, not `ThemeAudio`:** `ThemeAudio` is
+deliberately theme-scoped and shouldn't need to know `SystemAudio` exists (rule #2's theme/system
+separation) — `audioHooks.js` already imports both and is exactly the layer meant to coordinate
+across banks (same role it plays for e.g. `playReelStart()`'s `systemAudio.play("uiReelStart")` +
+`themeAudio.playReelStart()` pairing).
+
+**Why `SystemAudio.playSmallWinDigits()` bypasses `play()`'s pitch randomization:** the money
+counter is a sustained loop, not a one-shot tick — randomizing its pitch per-play would make it
+drift out of tune with itself every time it (re)starts, and `ThemeAudio`'s version never
+pitch-randomizes anything, so using `play()` here would make the systemic fallback behave
+audibly differently from the theme-specific version depending on which one happened to be active.
+Both call `this.howl.play(name)` directly instead, matching exactly.
+
+**Verified live**, via direct instrumentation on both `ThemeAudio` and `SystemAudio` instances
+through real spins: on China, `hasSmallWinDigits()` → `true` → only `ThemeAudio.playSmallWinDigits`/
+`.stopSmallWinDigits` fired, `SystemAudio`'s versions never touched. On Egypt (no custom money
+counter), the same check → `false` → only `SystemAudio.playSmallWinDigits`/`.stopSmallWinDigits`
+fired instead. `playWinLineDash()`/`playSmallWinBlink()` were confirmed to reach
+`systemAudio.play()` on every small win (guarded no-op today, since neither sprite exists) with
+zero console errors throughout.
+
+---
+
+## The per-theme symbol icon convention (Step 26)
+
+**This table is the canonical, persistent naming convention for every theme's 5 symbol icons.**
+It supersedes the looser keyword guesses Step 24 shipped with (those were inferred from the
+placeholder art's shapes, not an actual spec) — treat *this* table as the source of truth for
+what each slot is supposed to depict, going forward, not just a changelog entry. If a symbol's
+icon is ever replaced again, update this table to match, the same way any other binding
+project convention in this file is kept current.
+
+**The 5 slots always use the same fixed color, regardless of theme** (`--symbol-01` etc. in
+`css/styles.css`) — only the icon *concept* varies per theme:
+
+| Slot | Color |
+|---|---|
+| `symbol01` | Blue `#4f8ef7` |
+| `symbol02` | Green `#38b26a` |
+| `symbol03` | Coral `#e0574c` |
+| `symbol04` | Purple `#b06fe0` |
+| `wild` | Gold `#d4af37` |
+
+| Theme | symbol01 (blue) | symbol02 (green) | symbol03 (coral) | symbol04 (purple) | wild (gold) |
+|---|---|---|---|---|---|
+| Egypt | ibis bird / Horus | ankh | pyramid | pharaoh | scarab |
+| Mexico | piñata | sombrero | chili pepper | maracas | saloon / drink |
+| Vintage Arcade | joystick / retro controller | ghost | rocket | striped sun | bonus star / star badge |
+| Football | gloves | vuvuzela | referee whistle | soccer ball | trophy |
+| China | panda | dragon head | coins | pagoda | lantern |
+| Neon Drive | martini | F1 sports car | cassette | money stack | suitcase |
+
+*(Updated by Step 27: Arcade's symbol03 gap is filled — "rocket", not "diamond" — and Football's
+symbol01 changed from "trophy cup" to "gloves", freeing "trophy" to be Wild's plain concept name
+rather than "trophy (premium)"; see Step 27 for why, and for the file-naming convention the actual
+SVGs now follow — the `assets/themes/<theme>/<slot>.svg` paths this section originally described
+no longer exist.)*
+
+**Source and provenance:** the icons themselves came from a folder the user dropped at
+`assets/new icons/` — originally 29 raw SVGs (later joined by 2 more, `rocket.svg` and
+`gloves.svg`, for Step 27), each a standard game-icons.net export (a black `viewBox="0 0 512 512"`
+background square plus the actual icon as a single white path). A one-off Node script (not
+checked in — scratchpad-only) strips the black background and recolors each icon's path(s) to its
+slot's fixed color per the table above.
+
+**Two filenames needed disambiguation, resolved by reading their actual path data (not
+guessing from the name alone), then confirmed live in-browser:**
+- `trophy.svg` vs `diamond-trophy.svg` — Football needs a plain "trophy cup" (symbol01) *and* a
+  separate "trophy" for Wild. `trophy.svg`'s path is a plain trophy-cup silhouette →
+  `symbol01`; `diamond-trophy.svg`'s path is a fancier, diamond-topped trophy → `wild`, the
+  higher-tier symbol getting the more premium-looking version of the same object.
+- `allied-star.svg` — a circular badge with a star cutout (a "star badge" shape) → Arcade's
+  `wild` ("bonus star / star badge"). Not to be confused with `diamond-trophy.svg` above; the two
+  aren't related despite both having "diamond" energy in their shapes.
+
+**The original gap (Arcade's `symbol03`, 29 icons for 30 slots) was resolved in Step 27** — the
+user provided `rocket.svg` for it directly rather than a diamond/gem icon, so the *concept* for
+that slot changed to "rocket" instead of the gap being filled with the originally-requested
+"diamond". No slot is missing an icon as of Step 27.
+
+**Verified live** across all 6 themes via the Browser pane at the time: every icon rendered in
+its correct color and location, including both Football trophies (confirmed visually distinct —
+plain vs. diamond-topped) before Step 27 replaced the plain one's role with "gloves". See Step 27
+for its own live verification of the current state.
+
+---
+
+## Icon file naming convention + WILD text (Step 27)
+
+**1. Two icon concept changes, both by explicit request:**
+- **Arcade `symbol03`: "diamond" → "rocket".** The one gap Step 26 left open (no diamond/gem
+  icon was among the original 29) — rather than wait for a diamond icon, the user supplied
+  `rocket.svg` and changed the slot's own concept to match. Filled with the same
+  strip-background-and-recolor treatment as every other icon, coral (`symbol03`'s fixed color).
+- **Football `symbol01`: "trophy cup" → "gloves"**, via a new `gloves.svg`. This freed "trophy"
+  to be `wild`'s plain concept name (previously written as "trophy (premium)" specifically to
+  distinguish it from `symbol01`'s own trophy) — `wild` still uses `diamond-trophy.svg`'s art
+  (the fancier, diamond-topped one), unchanged; only `symbol01` actually swapped icons.
+  `trophy.svg` (the plain trophy, formerly `symbol01`) is now unused — left in
+  `assets/new icons/` per the instruction below, not deleted.
+
+**2. Every icon file was renamed to an explicit convention: `<theme>-<slot>-<color>-<keyword>.svg`**
+— e.g. `assets/themes/egypt/egypt-01-blue-horus.svg`, `assets/themes/football/football-wild-gold-trophy.svg`.
+`<slot>` is `01`-`04` or `wild` (matching `themes/<id>.json`'s `symbol01`...`symbol04`/`wild` keys
+directly); `<color>` is the slot's fixed color name (`blue`/`green`/`coral`/`purple`/`gold`), not
+a hex code; `<keyword>` is the concept from the Step 26 table (hyphenated — `chili-pepper`,
+`dragon-head`, `star-badge`, etc.). Replaces the old generic `symbol01.svg`/`wild.svg` names,
+which carried no information about what the file actually contained.
+
+**Old-named files were deleted, not left alongside the new ones** (`assets/themes/<theme>/`
+had exactly 5 files before this step and exactly 5 after — same count, new names, zero
+leftovers). This is safe because icon paths are 100% data-driven: `ReelController.js`'s
+`themeIconPath()` reads `theme.symbols[symbolId]` from the loaded theme JSON at runtime, never a
+hardcoded filename — so every `themes/<id>.json`'s `"symbols"` map was updated to point at the
+new paths in the same pass, and nothing in JS needed to change at all.
+
+**3. All 6 `wild` icons gained real "WILD" text**, baked into the SVG as a `<text>` element —
+Step 26's fresh icon set was purely the icon art with no text, unlike Step 24's old placeholder
+wilds (which all had `WILD` baked in). Positioned near the bottom of the `0 0 512 512` viewBox
+(`x="256" y="480"`), bold, cream fill (`#f2ead3`) with a thick dark stroke (`#0b0c10`,
+`stroke-width="10"`, `paint-order="stroke"`) for legibility regardless of what's directly behind
+it — same visual language Step 24's placeholders used, just scaled up for the new viewBox (the
+old convention was tuned for a `0 0 100 100` viewBox) and reproduced as a standalone element
+rather than copied per-file, so all 6 are pixel-identical in styling.
+
+**Unused source icons stay in `assets/new icons/`, untouched** — per explicit instruction, only
+icons actually mapped to a slot get copied out; anything left over (like the now-orphaned
+`trophy.svg`) simply sits there for potential future use, not deleted and not treated as an error.
+
+**Verified live** across all 6 themes via the Browser pane: Football shows gloves (`symbol01`)
+and a gold trophy with clearly legible "WILD" text; Arcade shows the rocket (`symbol03`) and the
+star-badge wild, also with legible "WILD" text; all 4 remaining themes' wild icons (scarab,
+saloon, lantern, suitcase) confirmed showing "WILD" text correctly too. Zero console errors
+throughout.
+
+---
+
 ## Theme switching / visual transition
 
 Both `ThemeTransition.swapTo(themeName)` (in-game dropdown) and `enterFromTerminal(themeName,
@@ -1377,6 +1581,14 @@ One Howl instance for the whole page session (`uiHover`, `uiClick`, `uiReelStart
 automatically gets the sound, no per-element wiring needed. Whole bank plays at -3dB
 (`SYSTEM_VOLUME_DB`). Every trigger gets a randomized playback rate between 0.94-1.06
 (`randomizedPitchRate()`, ±1 semitone) so repeated clicks don't sound robotically identical.
+
+**As of Step 25, `SystemAudio` tracks `_spriteNames`** (same purpose as `ThemeAudio`'s own set) —
+`play(name)` no-ops quietly if `name` isn't in `systemSounds.json`, the same guarded shape
+`ThemeAudio` has always used, letting a hook be wired up before its sprite exists (see Step 25).
+`SystemAudio` also gained `playSmallWinDigits()`/`stopSmallWinDigits()` — a systemic fallback for
+the small-win money counter, deliberately bypassing `play()`'s pitch randomization (calls
+`this.howl.play()` directly) since the money-counter loop isn't meant to be pitch-varied, matching
+`ThemeAudio`'s equivalent (which never randomizes pitch at all).
 
 ---
 

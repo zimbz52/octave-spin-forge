@@ -6,11 +6,11 @@
     "asset": "assets/themes/arcade/background.jpg"
   },
   "symbols": {
-    "symbol01": "assets/themes/arcade/symbol01.svg",
-    "symbol02": "assets/themes/arcade/symbol02.svg",
-    "symbol03": "assets/themes/arcade/symbol03.svg",
-    "symbol04": "assets/themes/arcade/symbol04.svg",
-    "wild": "assets/themes/arcade/wild.svg"
+    "symbol01": "assets/themes/arcade/arcade-01-blue-retro-controller.svg",
+    "symbol02": "assets/themes/arcade/arcade-02-green-ghost.svg",
+    "symbol03": "assets/themes/arcade/arcade-03-coral-rocket.svg",
+    "symbol04": "assets/themes/arcade/arcade-04-purple-striped-sun.svg",
+    "wild": "assets/themes/arcade/arcade-wild-gold-star-badge.svg"
   },
   "audio": {
     "intro": "assets/audio/arcade/intro.mp3",

@@ -1,8 +1,0 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <path d="M50 15 Q78 15 78 45 Q78 62 68 70 L68 82 L58 82 L58 72 L50 78 L42 72 L42 82 L32 82 L32 70 Q22 62 22 45 Q22 15 50 15 Z" fill="#d4af37"/>
-  <ellipse cx="38" cy="44" rx="8" ry="10" fill="#0b0c10" opacity="0.8"/>
-  <ellipse cx="62" cy="44" rx="8" ry="10" fill="#0b0c10" opacity="0.8"/>
-  <path d="M50 50 L45 62 L55 62 Z" fill="#0b0c10" opacity="0.6"/>
-  <path d="M38 68 L44 74 M50 68 L50 74 M62 68 L56 74" stroke="#0b0c10" stroke-width="3" opacity="0.6"/>
-  <text x="50" y="60" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="18" letter-spacing="0.5" fill="#f2ead3" stroke="#0b0c10" stroke-width="2.2" paint-order="stroke" stroke-linejoin="round">WILD</text>
-</svg>

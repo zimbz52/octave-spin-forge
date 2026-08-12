@@ -6,11 +6,11 @@
     "asset": "assets/themes/football/background.jpg"
   },
   "symbols": {
-    "symbol01": "assets/themes/football/symbol01.svg",
-    "symbol02": "assets/themes/football/symbol02.svg",
-    "symbol03": "assets/themes/football/symbol03.svg",
-    "symbol04": "assets/themes/football/symbol04.svg",
-    "wild": "assets/themes/football/wild.svg"
+    "symbol01": "assets/themes/football/football-01-blue-gloves.svg",
+    "symbol02": "assets/themes/football/football-02-green-vuvuzela.svg",
+    "symbol03": "assets/themes/football/football-03-coral-whistle.svg",
+    "symbol04": "assets/themes/football/football-04-purple-soccer-ball.svg",
+    "wild": "assets/themes/football/football-wild-gold-trophy.svg"
   },
   "audio": {
     "intro": "assets/audio/football/intro.mp3",

@@ -6,11 +6,11 @@
     "asset": "assets/themes/egypt/background.jpg"
   },
   "symbols": {
-    "symbol01": "assets/themes/egypt/symbol01.svg",
-    "symbol02": "assets/themes/egypt/symbol02.svg",
-    "symbol03": "assets/themes/egypt/symbol03.svg",
-    "symbol04": "assets/themes/egypt/symbol04.svg",
-    "wild": "assets/themes/egypt/wild.svg"
+    "symbol01": "assets/themes/egypt/egypt-01-blue-horus.svg",
+    "symbol02": "assets/themes/egypt/egypt-02-green-ankh.svg",
+    "symbol03": "assets/themes/egypt/egypt-03-coral-pyramid.svg",
+    "symbol04": "assets/themes/egypt/egypt-04-purple-pharaoh.svg",
+    "wild": "assets/themes/egypt/egypt-wild-gold-scarab.svg"
   },
   "audio": {
     "intro": "assets/audio/egypt/intro.mp3",

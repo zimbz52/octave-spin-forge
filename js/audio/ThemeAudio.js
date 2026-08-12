@@ -287,6 +287,14 @@ class ThemeAudio {
     if (name) this._play(name, dbToGain(SMALL_WIN_VOLUME_DB));
   }
 
+  // Whether the active theme defines its own small-win money-counter sound —
+  // audioHooks.js checks this to decide between this theme-specific pair and the
+  // generic systemic fallback (SystemAudio.playSmallWinDigits()) before calling
+  // either; see startWinRollup()/stopWinRollup() there.
+  hasSmallWinDigits() {
+    return this._spriteNames.has("winSmallDigits");
+  }
+
   // Starts the (typically looping) sound bed under the small-win counter's roll-up —
   // the small-win equivalent of playBigWinRiser(). No-ops quietly if the active bank
   // doesn't define winSmallDigits (only chinaSounds.json does so far); same guarded

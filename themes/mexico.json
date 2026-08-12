@@ -6,11 +6,11 @@
     "asset": "assets/themes/mexico/background.jpg"
   },
   "symbols": {
-    "symbol01": "assets/themes/mexico/symbol01.svg",
-    "symbol02": "assets/themes/mexico/symbol02.svg",
-    "symbol03": "assets/themes/mexico/symbol03.svg",
-    "symbol04": "assets/themes/mexico/symbol04.svg",
-    "wild": "assets/themes/mexico/wild.svg"
+    "symbol01": "assets/themes/mexico/mexico-01-blue-pinata.svg",
+    "symbol02": "assets/themes/mexico/mexico-02-green-sombrero.svg",
+    "symbol03": "assets/themes/mexico/mexico-03-coral-chili-pepper.svg",
+    "symbol04": "assets/themes/mexico/mexico-04-purple-maracas.svg",
+    "wild": "assets/themes/mexico/mexico-wild-gold-saloon.svg"
   },
   "audio": {
     "intro": "assets/audio/mexico/intro.mp3",

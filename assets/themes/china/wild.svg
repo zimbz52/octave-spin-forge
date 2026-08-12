@@ -1,6 +1,0 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <polygon points="14,38 66,38 84,22 32,22" fill="#f0d878"/>
-  <polygon points="14,38 66,38 66,68 14,68" fill="#d4af37"/>
-  <polygon points="66,38 84,22 84,52 66,68" fill="#b8912a"/>
-  <text x="50" y="86" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="17" letter-spacing="0.5" fill="#f2ead3" stroke="#0b0c10" stroke-width="2.2" paint-order="stroke" stroke-linejoin="round">WILD</text>
-</svg>
