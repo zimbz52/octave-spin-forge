@@ -6,7 +6,13 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 23
+Read this file first in any new session on this project. It reflects the state after Step 24
+(symbols got real per-theme icon art — a 2D SVG icon set per theme, 5 icons each, pulled
+dynamically from that theme's JSON `symbols` map, with a graceful fallback to the old CSS-shape
+rendering for any symbol a theme doesn't (yet) provide art for. `.symbol` itself became a plain
+invisible flexbox container; the Wild's win highlight was also split into its own, more aggressive
+class, distinct from the standard gold pulse other symbols get — see "Real per-theme symbol icons
+(Step 24)" below). Before that: Step 23
 (the Big Win counter's easing curve was reworked — a fast, non-decelerating climb through ~98% of
 the value, with a sharp brake confined to a short final slice, replacing a continuous ease-out
 that visibly dragged through the last several thousand points of a large win. Step 22's 550ms
@@ -234,10 +240,18 @@ assets/bg_<name>.jpg             Real per-theme background photos (Step 9's bgIm
                                   one: bg_egypt.jpg, bg_mexico.jpg, bg_arcade.jpg, bg_football.jpg,
                                   bg_china.jpg, bg_neondrive.jpg.
 
+assets/themes/<name>/            Real per-theme symbol icon art (Step 24's `symbols` target — see
+                                  "Real per-theme symbol icons (Step 24)"). 5 SVGs per theme:
+                                  symbol01-04.svg, wild.svg. Same slot colors across every theme
+                                  (--symbol-01/02/03/04/wild) — the shapes are theme-specific, the
+                                  color-per-slot is not, so a symbol's *role* stays visually
+                                  recognizable even after a theme switch.
+
 themes/                         Per-theme *visual* config stubs (themeName, bgImagePath — real,
-                                 see above — plus background/symbol asset paths that are still
-                                 unused-but-wired scaffolding for future art; don't confuse the
-                                 two, only bgImagePath is actually read by any code).
+                                 see above; symbols — also real as of Step 24, see above — plus a
+                                 `background.asset` stub field that's still unused-but-wired
+                                 scaffolding for a possible future full-background-art pass; don't
+                                 confuse the two, only bgImagePath and symbols are actually read).
   egypt.json, mexico.json, arcade.json, football.json, china.json, neondrive.json
 ```
 
@@ -929,14 +943,21 @@ it's structured as one call site; read Step 23 for *when*.
 wins only), three things now fire from one synchronous block instead of being only loosely
 related in time:
 
-1. **Digit punch** — a one-shot CSS animation on the counter digits: scale to 1.2x, flash pure
+1. **Digit punch** — a one-shot CSS animation on the counter digits: scale to 1.8x, flash pure
    white, then settle to gold (`var(--cabinet-accent)`) at scale 1.0. New class
    `.win-counter__value--climax-pulse` / `@keyframes win-counter-climax-pulse` in `styles.css`
    (250ms, `ease-out forwards` — `forwards` fill keeps the settled gold/scale(1) end state applied
    until the class is next removed). Per-keyframe `animation-timing-function` gives the up-swing a
    springy overshoot and the down-swing a sharp "slam" rather than one uniform easing curve for
    the whole thing. The 40%/60% keyframe pair holds the white flash for exactly 50ms of the 250ms
-   total.
+   total. **The peak scale was originally 1.2x, not 1.8x** — bumped in a later fix once real
+   testing showed the punch reading as a letdown: the roll-up itself already grows the digits up
+   to ~1.55x via `--climax-scale` as the count approaches its target (see below), and the punch
+   started from a reset `scale(1)` baseline, so a 1.2x peak was visually *smaller* than what was
+   already on screen a frame earlier. 1.8x (which the up-swing's overshoot easing actually carries
+   past, to ~1.87x measured live) clears that peak with real margin — the settle reads as the
+   biggest moment on screen, not a shrink from the climb. No duration, offset, or easing-curve
+   values changed, only the two `scale(1.8)` magnitudes at the 40%/60% keyframe.
 2. **Coin fountain emitter cutoff** — `CoinFountain.stopSpawning()` (new method) clears the spawn
    interval only, leaving `activeCoins` and their already-running fall animations completely
    alone. This is a genuinely new method, not a rename: the existing `stop()` (used only for
@@ -1048,6 +1069,168 @@ climax effects are meant to read as one instantaneous beat, not two).
   Step 22) — confirming no `setTimeout` reintroduced a delay.
 - A real small win afterward rolled up normally (0 → 50) with no change in behavior, confirming
   the small-win path is untouched.
+
+---
+
+## Real per-theme symbol icons (Step 24)
+
+**What changed:** symbols went from CSS-shape placeholders (clip-path + flat color + a "01"/"WILD"
+text label) to real 2D icon art — 5 hand-authored flat SVG icons per theme (symbol01-04, wild),
+one set per theme in `assets/themes/<name>/`, referenced by `themes/<name>.json`'s `symbols` map
+(which previously pointed at files that didn't exist — that map is genuinely read now, not
+scaffolding). Every icon uses the same slot color (`--symbol-01/02/03/04/wild`) across every
+theme — the *shape* is theme-specific, the *color* isn't, so a symbol's role (which slot it is)
+stays visually recognizable at a glance even after a theme switch, without needing to relearn 6
+different color languages.
+
+**Icon concepts are pinned to explicit SFX-object associations, not freely chosen per theme.**
+The user specified exactly which real-world object each symbol slot should depict, per theme —
+this table is the source of truth for what each icon *is*; if an icon ever needs redrawing, redraw
+it as this thing, not as whatever it currently looks like:
+
+| Theme | symbol01 (blue) | symbol02 (green) | symbol03 (red) | symbol04 (purple) | wild (gold) |
+|---|---|---|---|---|---|
+| Egypt | hawk/bird god | ankh | gem | hieroglyph tablet | scarab |
+| Mexico | piñata | sombrero | guitar | maraca/castanet pair | calavera skull |
+| Vintage Arcade | joystick | ghost | coin | D-pad | star burst |
+| Football | drum (+ drumsticks) | boot | whistle | trophy/cup | laurel ball |
+| China | gong (+ mallet) | tiger/lion face | money pouch | coin stack | gold bar |
+| Neon Drive | cocktail/whiskey glass | supercar | cassette tape | retro sun | sparkle star |
+
+A cell whose object coincides with the slot it already had before this pass (Vintage Arcade's
+whole set; Football's boot/trophy; Mexico's/China's/Neon Drive's wild; Neon Drive's cassette/retro
+sun) was deliberately left as the existing SVG rather than redrawn — "keep it" was an explicit
+instruction for some of these (Vintage Arcade especially: none of its 5 icons change "for the
+moment"), and for the rest the existing art already matched the newly-specified object, so
+redrawing it would only have introduced visual drift for no reason. Egypt and China had the most
+churn; everywhere else only 1-2 icons actually changed shape.
+
+**Egypt's symbol02 became the ankh, not scarab.** The first pass put scarab at both symbol02
+("any" — meaning keep the pre-existing icon, which happened to already be a scarab) *and* wild
+(freshly assigned "scarabei" per spec) — two scarabs on the same reel, differentiated only by
+color, was confusing in practice. Swapped symbol02 to the ankh instead — a shape this project
+already had fully designed and tested (it was symbol03's icon before the gem replaced it there),
+so reusing it here was zero new design risk, not just a convenient placeholder.
+
+**Every theme's wild icon carries a "WILD" text label overlaid on top of the gold icon art**, not
+just a plain shape — `<text ... fill="#f2ead3" stroke="#0b0c10" stroke-width="2.2"
+paint-order="stroke">WILD</text>`, appended as the *last* element in each `wild.svg` so it always
+paints in front of whatever icon art sits beneath it. `paint-order="stroke"` renders the black
+outline behind the cream fill (the standard SVG text-outline trick) — that's what keeps "WILD"
+legible regardless of how busy or light the icon underneath happens to be at that exact spot,
+without needing a separate background/ribbon shape behind the text (a plainer approach than a
+banner backing, but sufification enough since the outline alone gives reliable contrast). This is
+independent of whether a theme's wild icon's *art* changed in the table above — Egypt's did (new
+scarab), the other 5 didn't, but all 6 got the text added.
+
+**A legibility pass followed real user testing — several icons that looked fine in isolation didn't
+actually read as their intended object once seen live.** Each fix followed the same underlying
+lesson: **a flat icon needs a small number of unambiguous, well-separated primitive shapes — one
+intricate hand-drawn silhouette, or two shapes that overlap/blend together, reads as a blob rather
+than a specific object at actual reel-tile size, no matter how correct it looks zoomed in.**
+- **China's wild** went through *two* redraws. The first (a dragon head built from one long
+  meandering `<path>`) rendered as an unrecognizable lumpy blob. The second attempt (an ellipse +
+  3 triangles + a circle, composed as a horned creature head) fixed the blob problem but was still
+  reported as unclear *what it was supposed to be* — decomposing into simple shapes fixes
+  "muddy," it doesn't automatically fix "ambiguous concept." Replaced with an isometric gold bar
+  (3 flat polygons: a lighter top face, a gold front face, a darker side face) — an object with an
+  unambiguous silhouette even as 3 flat shapes, no organic curves to misread. Its top face was
+  first drawn as translucent white (`opacity: 0.5`) intending a lighter-gold highlight, but with no
+  gold underneath that specific polygon to blend with, it rendered as flat *gray* against the black
+  page background — replaced with a solid pre-computed light-gold hex (`#f0d878`) instead.
+  **Translucency for a "lighter tint" effect only works if there's actually something of the target
+  color behind it to blend with; on a plain background, use a solid pre-mixed color instead.**
+- **China's symbol01** (a pellet-drum-on-a-stick, meant to read as "shaker") rendered as a
+  mushroom/spinning-top instead — replaced with a gong + mallet (a large ringed disc plus a
+  separate stick-and-ball shape at a distance from it), which reads unambiguously as a percussion
+  instrument even though it's technically a different instrument than originally specified.
+- **Mexico's symbol03** (guitar) had a body silhouette but nothing marking it as a *stringed
+  instrument* specifically — no headstock, no strings, no bridge, just an ambiguous double-lobed
+  shape. Added a headstock with 2 tuning-peg dots, a neck, 2 visible strings running the full
+  length, and a bridge bar near the base — the diagnostic *details* of a guitar, not just its
+  outer contour, are what make it actually read as one.
+- **Neon Drive's symbol02** (supercar) had a real bug, not just an ambiguity: the wheel circles
+  were drawn at 60% opacity, straddling the car body's bottom edge exactly in half — the halves
+  overlapping the green body blended into a dark green, while the halves hanging below it (over
+  transparent background) rendered as flat black, so each wheel looked visually split in two.
+  Fixed by making the wheels fully opaque. Separately, the whole silhouette was redrawn lower and
+  wedge-shaped (sharp low nose, long sloped hood/roofline, small cabin greenhouse, raised rear
+  spoiler on its own support) to actually read as a Ferrari/Lamborghini-style profile instead of
+  the tall, boxy sedan-like shape it was before.
+- **Football's symbol03** (whistle) technically had a blow-hole nub and a grille slot already, but
+  the nub was drawn in the *exact same fill color* as the chamber behind it (`#e0574c` on
+  `#e0574c`), so it was invisible despite being present in the markup — a shape can be "there" in
+  the SVG and still be functionally invisible if it has zero contrast against what's behind it.
+  Redrawn with the blow-hole nub poking out *above* the chamber's own silhouette (so it's
+  contrasted against the black background instead of the same-color chamber) and a darker, taller,
+  higher-opacity grille slot for real contrast.
+
+**`.symbol` split into a container + content, not a single element:**
+- `.symbol` is now a plain, invisible flexbox container (`aspect-ratio: 1/1`, `background:
+  rgba(255,255,255,0.02)`, `border: 1px solid rgba(255,255,255,0.08)`, centered) — a faint hint of
+  a tile frame, not a colored shape. It's also still what `dataset.symbol` lives on and what the
+  win-state classes (below) target — nothing about its role as "the symbol element" changed from
+  the outside, `ReelController.getPaylineSymbolEl()`/`getVisibleSymbolEls()` still return it
+  directly, `SymbolCelebration.celebrate()` still clones it whole.
+- Inside it: either a themed `<img class="symbol__icon">` (the normal case now) with `filter:
+  drop-shadow(...)` (two stacked shadows — a tight dark one for physical depth, a soft wide one
+  for ambient glow) for depth, or — if the active theme has no art for that symbol, or the image
+  404s/fails to decode — a `.symbol__fallback` div carrying the *old* CSS-shape rendering
+  (`.symbol--01` etc.'s clip-path/color rules moved onto this element, unchanged otherwise) plus
+  the text label. This is the same "missing art degrades gracefully" contract Step 9 already
+  established for background photos (`ThemeTransition._applyBackdrop`) — not a new pattern, the
+  same one applied one layer deeper. `ReelController.js`'s `createFallbackEl()`/`themeIconPath()`
+  are the two functions that implement it; an `<img>`'s `onerror` swaps in the fallback element
+  in-place (`img.replaceWith(...)`) rather than just logging, so a bad path can never regress a
+  tile to a visibly broken image.
+
+**JSON integration:** `themeIconPath(symbolId)` reads `themeManager.currentTheme.symbols[symbolId]`
+at the moment each symbol element is created (`createSymbolEl()`, called from both `buildStrip()`
+and `setStatic()`) — always the *live* active theme, never cached at construction time. That's
+what makes a theme switch's new art show up correctly on the very next spin with zero extra code:
+`buildStrip()` already reads fresh on every call.
+
+**The one thing that reading-fresh-on-every-call doesn't cover: symbols already resting on the
+reel when a theme switch happens.** Nothing normally rebuilds those — no spin, no `buildStrip()`
+call — so without an explicit push they'd silently keep showing the old theme's icons (or the
+fallback shape) until the player's *next* spin happened to redraw them. Fixed with
+`ReelController.redrawIcons()` (calls `setStatic(this.lastSymbols)` — same currently-resting
+symbol ids, freshly re-rendered) and `GameController.refreshSymbolArt()` (calls it on every reel,
+skipped entirely while `isSpinning` — a reel mid-animation has no stable "resting" symbols to
+redraw, and the next spin will pick up the new art on its own regardless, so there's nothing unsafe
+being left un-fixed by skipping). `main.js` wires this to `themeManager`'s existing
+`themeconfigloaded` event (`ThemeManager.js`, unchanged) — which fires *during* the fade-to-black,
+before the backdrop/audio even start loading — so the icon swap happens fully behind the fade, the
+same invisible-swap timing the background photo and theme audio already get. No new event, no new
+plumbing between `ThemeTransition` and `GameController` — just one more listener on a signal that
+already existed for exactly this "something needs to react to the new theme" purpose.
+
+**The Win State — dormant Wild, two distinct win classes:** Wild carries no idle animation of any
+kind — same as before, this was never regressed. `ReelController._applyWinClass(el)` (called from
+`highlightPayline()` for small wins and `highlightAll()` for a blackout, replacing what used to be
+a bare `el.classList.add("symbol--win")` in both) checks `el.dataset.symbol === "wild"` and applies
+exactly one of two mutually-exclusive classes: `.symbol--win` (unchanged — the standard 0.9s gold
+pulse) for a base symbol, or `.symbol--wild-win` (new — a faster 0.5s pulse in `--powerbet-accent`
+red-orange rather than gold, deliberately reusing Powerbet's existing "this is a distinct
+high-energy mode" accent color rather than inventing a third) for a Wild. `clearHighlight()` strips
+both classes at the start of every spin, so there's never a stale highlight of either kind carried
+into a new spin. Verified via a forced blackout on Wild specifically (Powerbet's round-robin
+symbol cycle: `symbol01, symbol02, symbol03, wild, symbol04`, so 4 arm/disarm cycles lands it) —
+all 9 visible tiles came back `wildWin: true, win: false`, and a subsequent ordinary `symbol01`
+small win came back `win: true, wildWin: false` on the payline, `false/false` everywhere else.
+
+**Both win pulses are capped at exactly 3 flashes, not `infinite`.** The first version left them
+looping forever, which read as "stuck/broken" rather than celebratory on any spin where the player
+didn't immediately hit Spin again — `clearHighlight()` only ever runs at the *start* of the next
+spin, so an infinite pulse had no natural end otherwise. Fixed by changing both
+`animation: ... infinite` declarations to `animation: ... 3` (`animation-iteration-count: 3` via the
+shorthand) — one iteration is a full off→glow→off cycle, so 3 iterations reads as exactly 3
+flashes. `.symbol--wild-win`'s keyframes also had to change alongside this: its `0%, 100%` resting
+state used to hold a dim-but-nonzero glow (by design, back when the animation ran forever and never
+needed a genuine "off"), so simply capping the iteration count would have left a permanent faint
+halo behind once the 3rd flash landed on that keyframe. Its resting state is now fully transparent
+(`rgba(255, 92, 61, 0)` on both shadow layers) to match `.symbol--win`'s already-transparent resting
+state, so both genuinely go dark when they stop, not just stop animating.
 
 ---
 
@@ -1539,10 +1722,6 @@ floating dock). **The floating dock was chosen.** What that means concretely:
 
 ## What's deliberately NOT implemented yet
 
-- Real per-theme symbol art. Symbols are still CSS shapes (`themes/*.json`'s `symbols` paths point
-  at files that don't exist; intentional scaffolding). Backgrounds, by contrast, are fully real now
-  (Step 9 mechanism + actual photos for all 4 themes as of the Football addition) — see "Theme
-  switching / visual transition" above.
 - Several `audioHooks.js` functions remain pure `console.log` placeholders with no real sound
   wired in yet: `playWinStinger`, `playWinLineDash`, `playSymbolPulse`, `triggerWinClimax`,
   `playTransitionWhoosh` (no whoosh sprite exists in `systemSounds.json` yet). Check

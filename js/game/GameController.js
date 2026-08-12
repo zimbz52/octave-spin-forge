@@ -67,6 +67,18 @@ export class GameController {
     this.reels.forEach((reel) => reel.measure());
   }
 
+  // Redraws whatever's currently resting on each reel with the newly-active theme's
+  // icon art (main.js calls this off the themeconfigloaded event, which fires while
+  // the fade-to-black is still up — so the swap itself is never visible). Skipped
+  // entirely while a spin is in flight: a reel mid-animation has no stable "currently
+  // resting" symbols to redraw, and buildStrip() already reads the active theme's
+  // paths fresh on every spin regardless, so the next spin picks up the new art on
+  // its own without this — nothing to fix, just nothing safe to touch here yet.
+  refreshSymbolArt() {
+    if (this.isSpinning) return;
+    this.reels.forEach((reel) => reel.redrawIcons());
+  }
+
   async spin() {
     if (this.isSpinning) return;
     this.isSpinning = true;

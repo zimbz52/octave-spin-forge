@@ -1,4 +1,5 @@
 import { SYMBOLS, SYMBOL_META } from "../game/SpinSequence.js";
+import { themeManager } from "../theme/ThemeManager.js";
 
 // How many times the 5-symbol set repeats as spin filler before the strip lands on
 // the target symbols. Purely controls how far the landing animation has to travel —
@@ -10,16 +11,62 @@ const FILLER_CYCLES = 2;
 // Every reel always shows exactly 3 symbols (top/mid/bottom).
 const VISIBLE_COUNT = 3;
 
-function createSymbolEl(symbolId) {
-  const meta = SYMBOL_META[symbolId];
-  const el = document.createElement("div");
-  el.className = `symbol ${meta.className}`;
-  el.dataset.symbol = symbolId;
+// Looks up the active theme's real icon art for a symbol, if any. Returns null
+// (rather than throwing) whenever there's no theme loaded yet (page-load resting
+// grid, built before the startup terminal selection resolves) or the active theme's
+// JSON simply doesn't declare that symbol — same "missing art degrades gracefully"
+// contract Step 9 already established for background photos, not a new rule.
+function themeIconPath(symbolId) {
+  const theme = themeManager.currentTheme;
+  return (theme && theme.symbols && theme.symbols[symbolId]) || null;
+}
+
+// The old CSS-shape rendering (clip-path + flat color + text label), kept as the
+// fallback for whenever there's no themed icon art to show — either no theme loaded
+// yet, or the declared image path 404s/fails to decode. `.symbol--01` etc. already
+// carry the clip-path/color rules (see css/styles.css); nothing about those rules
+// changed, they just moved from `.symbol` itself onto this inner element once
+// `.symbol` became the plain icon container (see createSymbolEl below).
+function createFallbackEl(symbolId, meta) {
+  const fallback = document.createElement("div");
+  fallback.className = `symbol__fallback ${meta.className}`;
 
   const label = document.createElement("span");
   label.className = "symbol__label";
   label.textContent = meta.label;
-  el.appendChild(label);
+  fallback.appendChild(label);
+
+  return fallback;
+}
+
+// `.symbol` is a plain, visually invisible flexbox container (see css/styles.css) —
+// all it does is center whatever's actually representing this symbol, and carry the
+// win-state classes (highlightPayline/highlightAll below). The real content is
+// either a themed <img> icon (drop-shadow applied in CSS) or, if the active theme has
+// no art for this symbol yet, the fallback CSS shape.
+function createSymbolEl(symbolId) {
+  const meta = SYMBOL_META[symbolId];
+  const el = document.createElement("div");
+  el.className = "symbol";
+  el.dataset.symbol = symbolId;
+
+  const iconPath = themeIconPath(symbolId);
+  if (iconPath) {
+    const img = document.createElement("img");
+    img.className = "symbol__icon";
+    img.src = iconPath;
+    img.alt = meta.label;
+    img.draggable = false;
+    // A themed icon that 404s or fails to decode falls back to the CSS shape rather
+    // than leaving a broken-image glyph on the reel — swapped in-place, not just
+    // logged, so a bad path never regresses the reel to a visibly broken tile.
+    img.onerror = () => {
+      img.replaceWith(createFallbackEl(symbolId, meta));
+    };
+    el.appendChild(img);
+  } else {
+    el.appendChild(createFallbackEl(symbolId, meta));
+  }
 
   return el;
 }
@@ -242,7 +289,7 @@ export class ReelController {
 
   highlightPayline() {
     const middleSymbol = this.getPaylineSymbolEl();
-    if (middleSymbol) middleSymbol.classList.add("symbol--win");
+    if (middleSymbol) this._applyWinClass(middleSymbol);
   }
 
   // The currently-resting middle-row (payline) symbol element.
@@ -253,7 +300,18 @@ export class ReelController {
 
   // Blackout wins glow all 3 visible symbols (top/mid/bottom), not just the payline.
   highlightAll() {
-    this.getVisibleSymbolEls().forEach((el) => el.classList.add("symbol--win"));
+    this.getVisibleSymbolEls().forEach((el) => this._applyWinClass(el));
+  }
+
+  // Wilds stay dormant right up until a win is actually evaluated — no idle glow, no
+  // passive animation, nothing distinguishes an on-reel Wild from any other symbol
+  // until it's confirmed to be part of the connecting win. At that point a base
+  // symbol gets the standard gold highlight (symbol--win, unchanged); a Wild gets its
+  // own, more aggressive pulsing-border treatment instead (symbol--wild-win) — the
+  // two are mutually exclusive per element, never both on the same symbol.
+  _applyWinClass(el) {
+    const isWild = el.dataset.symbol === "wild";
+    el.classList.add(isWild ? "symbol--wild-win" : "symbol--win");
   }
 
   // The 3 currently-resting symbol elements (top/mid/bottom), in that order.
@@ -268,6 +326,20 @@ export class ReelController {
   }
 
   clearHighlight() {
-    this.stripEl.querySelectorAll(".symbol--win").forEach((el) => el.classList.remove("symbol--win"));
+    this.stripEl.querySelectorAll(".symbol--win, .symbol--wild-win").forEach((el) => {
+      el.classList.remove("symbol--win", "symbol--wild-win");
+    });
+  }
+
+  // Redraws the currently-resting symbols in place (no spin, no re-measure of which
+  // symbols are showing) so a theme switch's new icon art appears on symbols that
+  // were already sitting on the reel before the switch — otherwise they'd silently
+  // keep showing the previous theme's art (or the fallback shape) until the next
+  // spin happened to rebuild them. No-ops before the very first setStatic()/
+  // buildStrip() call (lastSymbols still null), which only matters on cold start
+  // before any theme has loaded — nothing to redraw yet in that case anyway.
+  redrawIcons() {
+    if (!this.lastSymbols) return;
+    this.setStatic(this.lastSymbols);
   }
 }

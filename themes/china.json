@@ -6,11 +6,11 @@
     "asset": "assets/themes/china/background.jpg"
   },
   "symbols": {
-    "symbol01": "assets/themes/china/symbol01.png",
-    "symbol02": "assets/themes/china/symbol02.png",
-    "symbol03": "assets/themes/china/symbol03.png",
-    "wild": "assets/themes/china/wild.png",
-    "scatter": "assets/themes/china/scatter.png"
+    "symbol01": "assets/themes/china/symbol01.svg",
+    "symbol02": "assets/themes/china/symbol02.svg",
+    "symbol03": "assets/themes/china/symbol03.svg",
+    "symbol04": "assets/themes/china/symbol04.svg",
+    "wild": "assets/themes/china/wild.svg"
   },
   "audio": {
     "intro": "assets/audio/china/intro.mp3",

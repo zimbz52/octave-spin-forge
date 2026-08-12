@@ -6,11 +6,11 @@
     "asset": "assets/themes/arcade/background.jpg"
   },
   "symbols": {
-    "symbol01": "assets/themes/arcade/symbol01.png",
-    "symbol02": "assets/themes/arcade/symbol02.png",
-    "symbol03": "assets/themes/arcade/symbol03.png",
-    "wild": "assets/themes/arcade/wild.png",
-    "scatter": "assets/themes/arcade/scatter.png"
+    "symbol01": "assets/themes/arcade/symbol01.svg",
+    "symbol02": "assets/themes/arcade/symbol02.svg",
+    "symbol03": "assets/themes/arcade/symbol03.svg",
+    "symbol04": "assets/themes/arcade/symbol04.svg",
+    "wild": "assets/themes/arcade/wild.svg"
   },
   "audio": {
     "intro": "assets/audio/arcade/intro.mp3",

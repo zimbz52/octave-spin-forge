@@ -227,6 +227,14 @@ async function init() {
   wireThemeSelect(themeTransition, devMixerPanel);
   const game = wireGame();
 
+  // themeManager (ThemeManager.js) dispatches this the instant a theme's JSON config
+  // resolves — during ThemeTransition's fade-to-black, before the backdrop/audio even
+  // start loading. Redrawing the reels' resting symbols with the new theme's icon art
+  // right here means the swap happens entirely behind the fade, same as the
+  // background photo and the theme audio already do — never a visible pop once the
+  // fade lifts.
+  document.addEventListener("themeconfigloaded", () => game.refreshSymbolArt());
+
   // Gatekeeper: nothing thematic loads — no theme JSON fetch, no ThemeAudio Howl
   // construction/playback — until the player picks a theme in the startup terminal.
   // That click is the page's first user gesture, which is what makes the audio that

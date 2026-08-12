@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="18" r="6" fill="#d4af37" opacity="0.6"/>
+  <ellipse cx="50" cy="55" rx="26" ry="20" fill="#d4af37"/>
+  <path d="M50 35 L50 75" stroke="#0b0c10" stroke-width="3" opacity="0.35"/>
+  <ellipse cx="50" cy="32" rx="10" ry="8" fill="#d4af37"/>
+  <path d="M28 45 L14 38 M28 55 L12 55 M28 65 L14 72" stroke="#d4af37" stroke-width="5" stroke-linecap="round"/>
+  <path d="M72 45 L86 38 M72 55 L88 55 M72 65 L86 72" stroke="#d4af37" stroke-width="5" stroke-linecap="round"/>
+  <text x="50" y="60" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="18" letter-spacing="0.5" fill="#f2ead3" stroke="#0b0c10" stroke-width="2.2" paint-order="stroke" stroke-linejoin="round">WILD</text>
+</svg>

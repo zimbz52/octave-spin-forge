@@ -1,0 +1,6 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <path d="M30 70 Q20 82 30 92 M70 70 Q80 82 70 92" stroke="#d4af37" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <circle cx="50" cy="46" r="26" fill="#d4af37"/>
+  <polygon points="50,30 55,42 68,42 58,50 62,63 50,55 38,63 42,50 32,42 45,42" fill="#0b0c10" opacity="0.35"/>
+  <text x="50" y="60" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="18" letter-spacing="0.5" fill="#f2ead3" stroke="#0b0c10" stroke-width="2.2" paint-order="stroke" stroke-linejoin="round">WILD</text>
+</svg>
