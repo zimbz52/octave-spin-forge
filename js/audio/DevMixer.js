@@ -26,6 +26,14 @@ const DEFAULT_THEME_MIXES = {
     busReelsNormal: 0.7,
     busPowerBet: 0.6,
   },
+  gangster: {
+    busMusic: 0.5,
+    busAtmosphere: 0.5,
+    busReelsNormal: 0.8,
+    busWinsSmall: 0.75,
+    busWinsSymbol: 0.65,
+    busPowerBet: 0.7,
+  },
 };
 
 // Pure state for the dev mixer: per-theme bus-gain multipliers, keyed exactly as

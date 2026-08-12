@@ -10,4 +10,5 @@ export const THEMES = [
   { id: "football", label: "Football" },
   { id: "china", label: "China" },
   { id: "neondrive", label: "Neon Drive" },
+  { id: "gangster", label: "Gangster" },
 ];

@@ -1,0 +1,20 @@
+{
+  "themeName": "Gangster",
+  "bgImagePath": "assets/bg_gangster.jpg",
+  "background": {
+    "id": "gangster_bg",
+    "asset": "assets/themes/gangster/background.jpg"
+  },
+  "symbols": {
+    "symbol01": "assets/themes/gangster/gangster-01-blue-revolver.svg",
+    "symbol02": "assets/themes/gangster/gangster-02-green-poker-hand.svg",
+    "symbol03": "assets/themes/gangster/gangster-03-coral-grand-piano.svg",
+    "symbol04": "assets/themes/gangster/gangster-04-purple-explosion.svg",
+    "wild": "assets/themes/gangster/gangster-wild-gold-reload.svg"
+  },
+  "audio": {
+    "intro": "assets/audio/gangster/intro.mp3",
+    "outro": "assets/audio/gangster/outro.mp3",
+    "backgroundLoop": "assets/audio/gangster/bg_loop.mp3"
+  }
+}

@@ -6,7 +6,16 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 27
+Read this file first in any new session on this project. It reflects the state after Step 28
+(a 7th theme, Gangster, was added via the standard pipeline — `assets/themes/gangster/`,
+`gangster-01-blue-revolver.svg`/`02-green-poker-hand`/`03-coral-grand-piano`/`04-purple-explosion`/
+`wild-gold-reload`, `bg_gangster.jpg`, registry entry, backdrop gradient. Its bank had two naming
+issues, both confirmed with the user before touching anything (per the Step 19 policy):
+`smallWin01-04` → `winSmall01-04` (same mistake-shape as Neon Drive originally had), and a
+genuinely new one — `startAnimationBigWin`/`startAnimationBigWinEnd`, a completely different name
+(not just reordered/miscased) for what turned out to be this bank's `winBigRiser`/`winBigRiserEnd`.
+Both fixed directly in the JSON, both file locations, same as every prior naming fix. See "Adding
+Gangster: a completely-renamed riser (Step 28)" below). Before that: Step 27
 (icon *files* now follow an explicit naming convention —
 `assets/themes/<theme>/<theme>-<slot>-<color>-<keyword>.svg`, e.g.
 `assets/themes/egypt/egypt-01-blue-horus.svg` — replacing the old generic `symbol01.svg`/`wild.svg`
@@ -1429,12 +1438,57 @@ rather than copied per-file, so all 6 are pixel-identical in styling.
 **Unused source icons stay in `assets/new icons/`, untouched** — per explicit instruction, only
 icons actually mapped to a slot get copied out; anything left over (like the now-orphaned
 `trophy.svg`) simply sits there for potential future use, not deleted and not treated as an error.
+*(Superseded by Step 28: the user later had the whole folder emptied out — see there — so this
+"leftovers accumulate" behavior no longer describes the current state, just the mechanism.)*
 
 **Verified live** across all 6 themes via the Browser pane: Football shows gloves (`symbol01`)
 and a gold trophy with clearly legible "WILD" text; Arcade shows the rocket (`symbol03`) and the
 star-badge wild, also with legible "WILD" text; all 4 remaining themes' wild icons (scarab,
 saloon, lantern, suitcase) confirmed showing "WILD" text correctly too. Zero console errors
 throughout.
+
+---
+
+## Adding Gangster: a completely-renamed riser (Step 28)
+
+**Same pipeline as every theme add** (China/Neon Drive/Egypt-refresh/Arcade-refresh, Steps
+17-21) — `themes/gangster.json`, `src/audio/gangsterSounds.json` (copied byte-for-byte per rule
+#4, after the fixes below), `assets/bg_gangster.jpg` (already present), one `THEMES` entry, one
+`THEME_BACKDROPS` gradient (warm charcoal/amber, matching a speakeasy/noir aesthetic), 5 icons
+processed through the same strip-background-and-recolor script as Steps 26-27 —
+`gangster-01-blue-revolver.svg`, `02-green-poker-hand`, `03-coral-grand-piano`,
+`04-purple-explosion` (source file `mine-explosion.svg`, concept name shortened to just
+"explosion"), `wild-gold-reload` (source file `reload-gun-barrel.svg`, concept name "reload").
+
+**Two naming issues found, both confirmed with the user before fixing anything (Step 19
+policy) — one familiar, one new:**
+- **`smallWin01-04` → `winSmall01-04`.** The exact same "words reversed" mistake-shape China and
+  Neon Drive already had. No hesitation needed here beyond the standard confirmation — same
+  fix, same treatment, both file locations (project copy + Drive source).
+- **`startAnimationBigWin`/`startAnimationBigWinEnd` → `winBigRiser`/`winBigRiserEnd`.** A
+  materially different case from every prior naming fix — not a reordering or a casing slip, a
+  *completely different name* for (very likely) the same role. Circumstantial evidence was
+  strong before asking — 15.7s duration (a long buildup, not a one-shot), positioned immediately
+  before `winBigT1` in the sprite sequence, exactly where every other bank's `winBigRiser` sits —
+  but "very likely" isn't "confirmed," and this is exactly the kind of structural ambiguity Step
+  19 exists for: asked directly rather than pattern-matching on circumstantial evidence alone.
+  Confirmed correct, fixed the same way (both file locations).
+
+**No `ThemeAudio.js`/`busRouting.js` changes for either fix** — both are exact-name corrections
+to sprites the code already expects, same as every prior naming-oversight fix since Step 19.
+
+**Verified live:** `_spriteNames` confirmed `winBigRiser`/`winBigRiserEnd`/`winSmall01`/
+`powerBetOn` all present, `smallWin01`/`startAnimationBigWin` both absent. A real forced Grand
+Win fired the sequence `winSymbol01 → winBigT1 → winBigRiser → winBigRiserEnd` correctly; a real
+small win fired `winSmall02` (the renamed sprite) correctly. Icons confirmed rendering with
+correct colors and legible "WILD" text on the reload icon. Egypt spot-checked afterward for
+regressions — clean. Zero console errors throughout.
+
+**`assets/new icons/`'s 5 consumed source files (`revolver.svg`, `poker-hand.svg`,
+`grand-piano.svg`, `mine-explosion.svg`, `reload-gun-barrel.svg`) were deleted after conversion**,
+keeping the folder down to just whatever hasn't been used yet (currently nothing — see the
+`.gitkeep`-only state from the prior session) — consuming an icon out of this folder means
+removing it from here, not leaving a copy behind.
 
 ---
 
