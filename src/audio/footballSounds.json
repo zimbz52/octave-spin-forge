@@ -13,143 +13,153 @@
       "duration": 6.1
     },
     {
-      "name": "musicMain",
+      "name": "musicBigWin",
       "start": 34,
+      "duration": 18.592
+    },
+    {
+      "name": "musicIntense_130",
+      "start": 53,
+      "duration": 44.308
+    },
+    {
+      "name": "musicMain_130",
+      "start": 98,
       "duration": 44.308
     },
     {
       "name": "reelStart01",
-      "start": 79,
+      "start": 143,
       "duration": 1.452
     },
     {
       "name": "reelStart02",
-      "start": 81,
+      "start": 145,
       "duration": 1.452
     },
     {
       "name": "reelStart03",
-      "start": 83,
+      "start": 147,
       "duration": 1.452
     },
     {
       "name": "reelStart04",
-      "start": 85,
+      "start": 149,
       "duration": 1.452
     },
     {
       "name": "reelStart05",
-      "start": 87,
+      "start": 151,
       "duration": 1.452
     },
     {
       "name": "reelStop01",
-      "start": 89,
+      "start": 153,
       "duration": 0.558
     },
     {
       "name": "reelStop02",
-      "start": 90,
+      "start": 154,
       "duration": 0.531
     },
     {
       "name": "reelStop03",
-      "start": 91,
+      "start": 155,
       "duration": 0.646
     },
     {
       "name": "reelStop04",
-      "start": 92,
+      "start": 156,
       "duration": 0.634
     },
     {
       "name": "reelStop05",
-      "start": 93,
+      "start": 157,
       "duration": 0.536
     },
     {
       "name": "reelTurbo01",
-      "start": 94,
+      "start": 158,
       "duration": 1.058
     },
     {
       "name": "reelTurbo02",
-      "start": 96,
+      "start": 160,
       "duration": 1.249
     },
     {
       "name": "reelTurbo03",
-      "start": 98,
+      "start": 162,
       "duration": 1.146
     },
     {
       "name": "reelTurbo04",
-      "start": 100,
+      "start": 164,
       "duration": 1.409
     },
     {
       "name": "reelTurbo05",
-      "start": 102,
+      "start": 166,
       "duration": 1.305
     },
     {
       "name": "winBigRiser",
-      "start": 104,
+      "start": 168,
       "duration": 24.118
     },
     {
       "name": "winBigRiserEnd",
-      "start": 129,
+      "start": 193,
       "duration": 4.559
     },
     {
       "name": "winBigT1",
-      "start": 134,
+      "start": 198,
       "duration": 3.106
     },
     {
       "name": "winSmall01",
-      "start": 138,
+      "start": 202,
       "duration": 3.6
     },
     {
       "name": "winSmall02",
-      "start": 142,
+      "start": 206,
       "duration": 3.6
     },
     {
       "name": "winSmall03",
-      "start": 146,
+      "start": 210,
       "duration": 3.6
     },
     {
       "name": "winSmall04",
-      "start": 150,
+      "start": 214,
       "duration": 3.6
     },
     {
       "name": "winSymbol01",
-      "start": 154,
+      "start": 218,
       "duration": 2.339
     },
     {
       "name": "winSymbol02",
-      "start": 157,
+      "start": 221,
       "duration": 3.299
     },
     {
       "name": "winSymbol03",
-      "start": 161,
+      "start": 225,
       "duration": 1.788
     },
     {
       "name": "winSymbolScatter",
-      "start": 163,
+      "start": 227,
       "duration": 6.578
     },
     {
       "name": "winSymbolWild",
-      "start": 170,
+      "start": 234,
       "duration": 1.622
     }
   ]

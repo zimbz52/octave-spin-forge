@@ -142,6 +142,17 @@ export function stopWinRollup(type) {
   if (type === "small") stopSmallWinDigits();
 }
 
+// Fires as soon as a Big Win is confirmed (blackout), before its entry — computes and
+// waits out the delay to the next musical 8th-note boundary of the currently-playing
+// musicMain (see ThemeAudio.scheduleBigWinEntry()), pausing the adaptive-music idle
+// cooldown for the duration and hard-ducking both music layers to silence the instant
+// it resolves. Callers should await this, then fire the riser/reveal the widget right
+// after — both land on the same beat the duck does.
+export function scheduleBigWinEntry() {
+  console.log("[audio hook] scheduleBigWinEntry()");
+  return themeAudio.scheduleBigWinEntry();
+}
+
 // Fires the exact moment the big win overlay screen appears — a one-shot stinger
 // distinct from playWinStinger (which already fired earlier, during the on-reel
 // celebration that precedes the widget showing up).

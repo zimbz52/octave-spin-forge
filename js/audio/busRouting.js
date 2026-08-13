@@ -8,10 +8,13 @@ const BUS_RULES = [
   { bus: "busReelsTurbo", test: (name) => name.startsWith("reelTurbo") },
   { bus: "busReelsNormal", test: (name) => name.startsWith("reelStart") || name.startsWith("reelStop") },
   // musicIntense is the optional high-energy layer of the adaptive vertical-layering
-  // system (see ThemeAudio.notifySmallWin()) — shares busMusic with musicMain so a
-  // single Dev-Mixer slider scales both layers together regardless of which is
-  // currently faded up.
-  { bus: "busMusic", test: (name) => name === "musicMain" || name === "musicIntense" },
+  // system (see ThemeAudio.notifySmallWin()); musicBigWin is the optional dedicated
+  // Big Win music bed (see ThemeAudio.playBigWinRiser()) — all three share busMusic so
+  // a single Dev-Mixer slider scales every music layer together. Each also tolerates
+  // an optional "_<bpm>" suffix (e.g. "musicMain_114") — the BPM-embedding convention
+  // Arcade's v02 bank introduced (see ThemeAudio._findMusicSpriteName()/
+  // audioUtils.bpmFromSpriteName()) — rather than matching the bare name only.
+  { bus: "busMusic", test: (name) => /^(musicMain|musicIntense|musicBigWin)(_\d{2,3})?$/.test(name) },
   { bus: "busAtmosphere", test: (name) => name === "gameAmbLP" || name === "gameStart" },
   // winSmall01-04 (the flavor layer) and winSmallDigits/winSmallDigitsEnd (the counter
   // roll-up bed + its completion sting, see "Adding China" below) share this bus — both

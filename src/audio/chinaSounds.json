@@ -13,138 +13,148 @@
       "duration": 3.966
     },
     {
-      "name": "musicMain",
+      "name": "musicBigWin",
       "start": 19,
-      "duration": 16
+      "duration": 17.346
+    },
+    {
+      "name": "musicIntense_120",
+      "start": 37,
+      "duration": 15.966
+    },
+    {
+      "name": "musicMain_120",
+      "start": 53,
+      "duration": 15.966
     },
     {
       "name": "powerBetOff",
-      "start": 35,
+      "start": 69,
       "duration": 2.184
     },
     {
       "name": "powerBetOn",
-      "start": 38,
+      "start": 72,
       "duration": 2.109
     },
     {
       "name": "reelStart01",
-      "start": 41,
+      "start": 75,
       "duration": 1.451
     },
     {
       "name": "reelStart02",
-      "start": 43,
+      "start": 77,
       "duration": 1.505
     },
     {
       "name": "reelStart03",
-      "start": 45,
+      "start": 79,
       "duration": 1.387
     },
     {
       "name": "reelStop01",
-      "start": 47,
+      "start": 81,
       "duration": 0.296
     },
     {
       "name": "reelStop02",
-      "start": 48,
+      "start": 82,
       "duration": 0.297
     },
     {
       "name": "reelStop03",
-      "start": 49,
+      "start": 83,
       "duration": 0.296
     },
     {
       "name": "reelStop04",
-      "start": 50,
+      "start": 84,
       "duration": 0.29
     },
     {
       "name": "reelStop05",
-      "start": 51,
+      "start": 85,
       "duration": 0.293
     },
     {
       "name": "reelTurbo01",
-      "start": 52,
+      "start": 86,
       "duration": 0.412
     },
     {
       "name": "reelTurbo02",
-      "start": 53,
+      "start": 87,
       "duration": 0.424
     },
     {
       "name": "reelTurbo03",
-      "start": 54,
+      "start": 88,
       "duration": 0.436
     },
     {
       "name": "winBigRiser",
-      "start": 55,
+      "start": 89,
       "duration": 17.973
     },
     {
       "name": "winBigRiserEnd",
-      "start": 73,
+      "start": 107,
       "duration": 2.666
     },
     {
       "name": "winBigT1",
-      "start": 76,
+      "start": 110,
       "duration": 2.428
     },
     {
       "name": "winSmall01",
-      "start": 79,
+      "start": 113,
       "duration": 1.384
     },
     {
       "name": "winSmall02",
-      "start": 81,
+      "start": 115,
       "duration": 1.526
     },
     {
       "name": "winSmall03",
-      "start": 83,
+      "start": 117,
       "duration": 1.554
     },
     {
       "name": "winSmallDigits",
-      "start": 85,
+      "start": 119,
       "duration": 5.038
     },
     {
       "name": "winSmallDigitsEnd",
-      "start": 91,
+      "start": 125,
       "duration": 0.447
     },
     {
       "name": "winSymbol01",
-      "start": 92,
+      "start": 126,
       "duration": 1.214
     },
     {
       "name": "winSymbol02",
-      "start": 94,
+      "start": 128,
       "duration": 1.311
     },
     {
       "name": "winSymbol03",
-      "start": 96,
+      "start": 130,
       "duration": 0.91
     },
     {
       "name": "winSymbol04",
-      "start": 97,
+      "start": 131,
       "duration": 2.329
     },
     {
       "name": "winSymbolWild",
-      "start": 100,
+      "start": 134,
       "duration": 2.566
     }
   ]

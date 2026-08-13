@@ -13,6 +13,7 @@ import {
   playSmallWinBlink,
   playThemeSmallWin,
   playThemeSymbolWin,
+  scheduleBigWinEntry,
   playBigWinIntro,
   stopBigWinRiser,
 } from "../audio/audioHooks.js";
@@ -125,6 +126,12 @@ export class GameController {
         playThemeSymbolWin(outcome.payline[0]);
         const allEls = this.reels.flatMap((reel) => reel.getVisibleSymbolEls());
         await Promise.all(allEls.map((el) => this.celebration.celebrate(el)));
+
+        // Quantized entry: waits for the next musical 8th-note boundary before
+        // continuing, hard-ducking the music the instant it resolves — the riser and
+        // widget below land on that same beat, not whenever the celebration above
+        // happened to finish.
+        await scheduleBigWinEntry();
 
         // One-shot stinger the exact moment the overlay screen appears, distinct from
         // playWinStinger above (which already fired earlier, during the on-reel

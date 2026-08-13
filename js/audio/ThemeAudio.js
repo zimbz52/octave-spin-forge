@@ -4,7 +4,7 @@
 // appears anywhere except the config file path itself, which is derived from the
 // active theme's name.
 
-import { dbToGain } from "./audioUtils.js";
+import { dbToGain, parseBpmFromPath, bpmFromSpriteName, DEFAULT_BPM } from "./audioUtils.js";
 import { getBusForSprite } from "./busRouting.js";
 import { devMixer } from "./DevMixer.js";
 
@@ -27,10 +27,13 @@ const SYMBOL_SPRITE_MAP = {
 // pulled down by default, same rationale/mechanism as SystemAudio's -3dB UI trim.
 const SMALL_WIN_VOLUME_DB = -2;
 
-// Ducks musicMain out of the way while the big win riser plays, so the riser reads
-// clearly instead of fighting the music bed for space.
-const MUSIC_DUCK_DB = -3;
-const MUSIC_DUCK_MS = 1000;
+// Big Win quantized entry: both music layers are hard-ducked to silence together the
+// instant the entry lands on the next musical 8th-note (see scheduleBigWinEntry()),
+// snappy enough (100ms) to read as a hard cut rather than a fade. They're brought
+// back over BIG_WIN_UNDUCK_MS once winBigRiserEnd fires (see stopBigWinRiser()) —
+// long enough that the riser-end sting's own tail masks the crossfade back in.
+const BIG_WIN_DUCK_MS = 100;
+const BIG_WIN_UNDUCK_MS = 2000;
 
 // musicMain fades in from silence rather than snapping straight to its target volume —
 // see _playMusicLoop().
@@ -53,6 +56,10 @@ class ThemeAudio {
     this.howl = null;
     this.musicId = null;
     this.musicIntenseId = null;
+    // The dedicated Big Win music bed (optional — see _findMusicSpriteName()),
+    // started alongside winBigRiser in playBigWinRiser() and stopped alongside it in
+    // stopBigWinRiser(), "on beat" with the riser per the same quantized entry point.
+    this.musicBigWinId = null;
     this.ambientId = null;
     this.riserId = null;
     this.smallWinDigitsId = null;
@@ -60,21 +67,44 @@ class ThemeAudio {
     this.currentTheme = null;
     this._loadToken = 0;
     this._spriteNames = new Set();
+    // The actual sprite name each music layer resolved to (see _findMusicSpriteName())
+    // — may carry a "_<bpm>" suffix (e.g. "musicMain_114") per Arcade's v02 bank, so
+    // code that needs the *sprite name* (bus lookups, BPM parsing) can't just assume
+    // the bare "musicMain"/"musicIntense"/"musicBigWin" literals anymore.
+    this._musicMainSpriteName = null;
+    this._musicIntenseSpriteName = null;
+    this._musicBigWinSpriteName = null;
     // Persists across theme switches/teardowns — the fader position shouldn't reset
     // itself just because the player changed themes.
     this.musicVolume = 1;
-    // musicMain's volume right before a duck, so the fade-in on winBigRiserEnd
-    // restores exactly where it left off rather than assuming a hardcoded 1.0.
-    this._musicVolumeBeforeDuck = null;
     // 0 = musicMain fully active (resting state), 1 = musicIntense fully active.
     // Themes with no musicIntense sprite simply never leave 0 — see notifySmallWin().
     this.musicIntensityWeight = 0;
     this._smallWinCooldownTimer = null;
+    // Wall-clock deadline (Date.now()-based) the active cooldown timer is counting
+    // down to — lets _pauseIntensityCooldown() compute exactly how much time was left
+    // rather than just clearing the timer and losing that, so _resumeIntensityCooldown()
+    // can pick back up with the true remainder instead of a fresh full countdown.
+    this._cooldownDeadline = null;
+    // Set only while a Big Win's quantized entry has paused the cooldown mid-countdown
+    // (null otherwise, including "cooldown wasn't running at all when paused") — see
+    // _pauseIntensityCooldown()/_resumeIntensityCooldown().
+    this._cooldownPausedRemainingMs = null;
     // True for the duration of an in-flight crossfade (see DevMixer.getCrossfadeMs())
     // so refreshMusicVolume() (fader/mixer changes) doesn't fight Howler's own fade
     // animation mid-flight — it re-applies once the crossfade settles instead.
     this._musicCrossfadeActive = false;
     this._crossfadeSettleTimer = null;
+    // Parsed fresh on every loadTheme() from the bank's own src path — see
+    // parseBpmFromPath()/_msToNextEighth().
+    this._bpm = DEFAULT_BPM;
+    // Each music layer's actual volume right before a Big Win's hard duck, so
+    // _restoreMusicAfterBigWin() can put it back exactly where it was (whatever
+    // musicIntensityWeight mix it was actually in) rather than a freshly recomputed
+    // target.
+    this._musicMainVolumeBeforeBigWinDuck = null;
+    this._musicIntenseVolumeBeforeBigWinDuck = null;
+    this._bigWinRestoreTimer = null;
   }
 
   // Loads and activates a theme's audio bank by name (e.g. "egypt"). Strictly
@@ -112,6 +142,7 @@ class ThemeAudio {
       sprite[sound.name] = [sound.start * 1000, sound.duration * 1000];
       spriteNames.add(sound.name);
     });
+    this._bpm = parseBpmFromPath(bank.src);
 
     // Awaited all the way to onload/onloaderror (not just the JSON parse above) — a
     // caller gating a visual reveal on this (the fade lift) needs the audio to
@@ -149,18 +180,28 @@ class ThemeAudio {
     this.howl = null;
     this.musicId = null;
     this.musicIntenseId = null;
+    this.musicBigWinId = null;
     this.ambientId = null;
     this.riserId = null;
     this.smallWinDigitsId = null;
     this.ready = false;
     this._spriteNames = new Set();
-    this._musicVolumeBeforeDuck = null;
+    this._musicMainSpriteName = null;
+    this._musicIntenseSpriteName = null;
+    this._musicBigWinSpriteName = null;
     this.musicIntensityWeight = 0;
     clearTimeout(this._smallWinCooldownTimer);
     this._smallWinCooldownTimer = null;
+    this._cooldownDeadline = null;
+    this._cooldownPausedRemainingMs = null;
     clearTimeout(this._crossfadeSettleTimer);
     this._crossfadeSettleTimer = null;
     this._musicCrossfadeActive = false;
+    this._bpm = DEFAULT_BPM;
+    this._musicMainVolumeBeforeBigWinDuck = null;
+    this._musicIntenseVolumeBeforeBigWinDuck = null;
+    clearTimeout(this._bigWinRestoreTimer);
+    this._bigWinRestoreTimer = null;
   }
 
   // gameAmbLP (the ambient SFX bed), gameStart (if the bank has one), and musicMain
@@ -184,23 +225,45 @@ class ThemeAudio {
     this.howl.volume(this._busGain("gameAmbLP"), this.ambientId);
   }
 
+  // Finds a music-family sprite by its base name ("musicMain", "musicIntense",
+  // "musicBigWin"), tolerating an optional "_<bpm>" suffix (e.g. "musicMain_114") —
+  // the BPM-embedding convention Arcade's v02 bank introduced (see
+  // audioUtils.bpmFromSpriteName()). Returns the sprite's exact name as it appears in
+  // the bank, or null if neither form is defined.
+  _findMusicSpriteName(baseName) {
+    if (this._spriteNames.has(baseName)) return baseName;
+    const pattern = new RegExp(`^${baseName}_\\d{2,3}$`);
+    return [...this._spriteNames].find((name) => pattern.test(name)) ?? null;
+  }
+
   _playMusicLoop() {
     // Strict singleton: never start a second overlapping music-loop instance.
     if (this.musicId !== null && this.howl.playing(this.musicId)) return;
-    if (!this._spriteNames.has("musicMain")) return; // bank defines no music track
 
-    // musicIntense (optional — no bank defines it yet) is started in the same
-    // synchronous tick as musicMain, both looping, so the two layers stay phase-locked
-    // as one loop played twice rather than two independently-timed loops that merely
-    // share a tempo. It plays silently from the start; only its *volume* crossfades
-    // later (see notifySmallWin()) — starting it later on the first small win would
-    // not be phase-aligned with musicMain's already-in-progress loop position.
-    const hasIntense = this._spriteNames.has("musicIntense");
+    const mainName = this._findMusicSpriteName("musicMain");
+    if (!mainName) return; // bank defines no music track
 
-    this.musicId = this.howl.play("musicMain");
+    // musicIntense (optional) is started in the same synchronous tick as musicMain,
+    // both looping, so the two layers stay phase-locked as one loop played twice
+    // rather than two independently-timed loops that merely share a tempo. It plays
+    // silently from the start; only its *volume* crossfades later (see
+    // notifySmallWin()) — starting it later on the first small win would not be
+    // phase-aligned with musicMain's already-in-progress loop position.
+    const intenseName = this._findMusicSpriteName("musicIntense");
+    this._musicMainSpriteName = mainName;
+    this._musicIntenseSpriteName = intenseName;
+    this._musicBigWinSpriteName = this._findMusicSpriteName("musicBigWin");
+
+    // A BPM embedded in the sprite name itself (mainName's own "_<bpm>" suffix, if
+    // any) takes priority over the file-path-based parse loadTheme() already did —
+    // the more specific, per-track source of truth when both are available.
+    const spriteBpm = bpmFromSpriteName(mainName);
+    if (spriteBpm !== null) this._bpm = spriteBpm;
+
+    this.musicId = this.howl.play(mainName);
     this.howl.loop(true, this.musicId);
-    if (hasIntense) {
-      this.musicIntenseId = this.howl.play("musicIntense");
+    if (intenseName) {
+      this.musicIntenseId = this.howl.play(intenseName);
       this.howl.loop(true, this.musicIntenseId);
       this.howl.volume(0, this.musicIntenseId);
     }
@@ -241,17 +304,19 @@ class ThemeAudio {
   // crossfade weight (musicIntensityWeight), not an independent number per layer —
   // see _crossfadeToIntensity()/refreshMusicVolume().
   _musicTargetVolume() {
-    return this._scaledMusicVolume() * this._busGain("musicMain");
+    return this._scaledMusicVolume() * this._busGain(this._musicMainSpriteName ?? "musicMain");
   }
 
   // Re-applies the current target volume to whatever's actually playing on musicId
-  // (and musicIntenseId, weighted) — called after either the fader or the dev mixer's
-  // busMusic slider changes, so a continuous loop reacts live instead of only picking
-  // up the new value next time it starts. No-ops harmlessly if music isn't playing
-  // yet, and skips while a crossfade is actively animating (see
-  // _musicCrossfadeActive) so it doesn't fight Howler's own fade loop mid-flight —
-  // _crossfadeToIntensity()'s settle timer calls this again once the fade completes,
-  // which is when any fader/mixer change made during that window actually lands.
+  // (and musicIntenseId, weighted; and musicBigWinId, unweighted — it's an on/off
+  // third layer, not part of the vertical-layering crossfade) — called after either
+  // the fader or the dev mixer's busMusic slider changes, so a continuous loop reacts
+  // live instead of only picking up the new value next time it starts. No-ops
+  // harmlessly if music isn't playing yet, and skips while a crossfade is actively
+  // animating (see _musicCrossfadeActive) so it doesn't fight Howler's own fade loop
+  // mid-flight — _crossfadeToIntensity()'s settle timer calls this again once the
+  // fade completes, which is when any fader/mixer change made during that window
+  // actually lands.
   refreshMusicVolume() {
     if (!this.howl || this.musicId === null) return;
     if (this._musicCrossfadeActive) return;
@@ -259,6 +324,9 @@ class ThemeAudio {
     this.howl.volume((1 - this.musicIntensityWeight) * multiplier, this.musicId);
     if (this.musicIntenseId !== null) {
       this.howl.volume(this.musicIntensityWeight * multiplier, this.musicIntenseId);
+    }
+    if (this.musicBigWinId !== null) {
+      this.howl.volume(multiplier, this.musicBigWinId);
     }
   }
 
@@ -346,10 +414,48 @@ class ThemeAudio {
 
     if (this.musicIntensityWeight < 1) this._crossfadeToIntensity(1);
 
+    this._armIntensityCooldown(SMALL_WIN_INTENSITY_COOLDOWN_MS);
+  }
+
+  // Arms (or re-arms) the idle-fade-down timer for `remainingMs`, tracking its
+  // wall-clock deadline (Date.now()-based, not just the timer handle) so
+  // _pauseIntensityCooldown() can later compute exactly how much time was actually
+  // left rather than losing that the moment the timer's cleared.
+  _armIntensityCooldown(remainingMs) {
     clearTimeout(this._smallWinCooldownTimer);
+    this._cooldownDeadline = Date.now() + remainingMs;
     this._smallWinCooldownTimer = setTimeout(() => {
+      this._smallWinCooldownTimer = null;
+      this._cooldownDeadline = null;
       this._crossfadeToIntensity(0);
-    }, SMALL_WIN_INTENSITY_COOLDOWN_MS);
+    }, remainingMs);
+  }
+
+  // Freezes the idle-fade-down countdown mid-flight — used while a Big Win's
+  // quantized entry has the music hard-ducked (see scheduleBigWinEntry()), so the
+  // idle timer can't independently fire a crossfade-to-0 that fights the duck/restore
+  // fades over the same Howler ids. Records the true remaining time (not just "was
+  // running") so _resumeIntensityCooldown() can continue rather than restart the
+  // countdown. A no-op capture (remaining = null) if nothing was actually counting
+  // down when this was called — resume then correctly does nothing either.
+  _pauseIntensityCooldown() {
+    if (this._smallWinCooldownTimer === null) {
+      this._cooldownPausedRemainingMs = null;
+      return;
+    }
+    clearTimeout(this._smallWinCooldownTimer);
+    this._smallWinCooldownTimer = null;
+    this._cooldownPausedRemainingMs = Math.max(0, this._cooldownDeadline - Date.now());
+    this._cooldownDeadline = null;
+  }
+
+  // Continues a countdown _pauseIntensityCooldown() froze, picking up with whatever
+  // time was actually left rather than a fresh SMALL_WIN_INTENSITY_COOLDOWN_MS.
+  _resumeIntensityCooldown() {
+    if (this._cooldownPausedRemainingMs === null) return;
+    const remaining = this._cooldownPausedRemainingMs;
+    this._cooldownPausedRemainingMs = null;
+    this._armIntensityCooldown(remaining);
   }
 
   // Crossfades musicMain and musicIntense to the given intensity weight (1 = intense
@@ -378,6 +484,80 @@ class ThemeAudio {
       // Picks up any fader/busMusic mixer change that happened during the crossfade.
       this.refreshMusicVolume();
     }, crossfadeMs);
+  }
+
+  // --- Big Win quantized entry (BPM-synced anticipation + duck) ---
+
+  // Milliseconds from musicMain's *current* playback position to the next 8th note
+  // (half-beat), per the active theme's parsed BPM (_bpm, see parseBpmFromPath()).
+  // 0 if there's no music actually playing to measure against — scheduleBigWinEntry()
+  // then fires immediately rather than waiting on a position that doesn't exist.
+  _msToNextEighth() {
+    if (!this.howl || this.musicId === null) return 0;
+    const seekSeconds = this.howl.seek(this.musicId);
+    if (typeof seekSeconds !== "number") return 0;
+    const msPerEighth = 60000 / this._bpm / 2;
+    return msPerEighth - ((seekSeconds * 1000) % msPerEighth);
+  }
+
+  // Hard-ducks both music layers to silence together — not the old dB-based partial
+  // duck this replaced, a full cut, and snappy (BIG_WIN_DUCK_MS) rather than gradual,
+  // timed to land exactly on the quantized entry point scheduleBigWinEntry() computed.
+  // Captures each layer's actual current volume first (whatever musicIntensityWeight
+  // mix it was actually in) so _restoreMusicAfterBigWin() can put it back exactly.
+  _duckMusicForBigWin() {
+    if (!this.howl || this.musicId === null) return;
+    this._musicMainVolumeBeforeBigWinDuck = this.howl.volume(this.musicId);
+    this.howl.fade(this._musicMainVolumeBeforeBigWinDuck, 0, BIG_WIN_DUCK_MS, this.musicId);
+    if (this.musicIntenseId !== null) {
+      this._musicIntenseVolumeBeforeBigWinDuck = this.howl.volume(this.musicIntenseId);
+      this.howl.fade(this._musicIntenseVolumeBeforeBigWinDuck, 0, BIG_WIN_DUCK_MS, this.musicIntenseId);
+    }
+  }
+
+  // The "curtained exit" — fades both layers back up from silence over
+  // BIG_WIN_UNDUCK_MS, called the instant winBigRiserEnd fires (see
+  // stopBigWinRiser()) so that sting's own tail masks the crossfade back in.
+  // Restores each layer to exactly the volume _duckMusicForBigWin() captured, not a
+  // freshly recomputed target — the mix might genuinely have been mid-crossfade when
+  // the duck hit. Once the fade's full duration has elapsed, resumes whatever
+  // intensity cooldown scheduleBigWinEntry() paused for the win.
+  _restoreMusicAfterBigWin() {
+    if (!this.howl || this.musicId === null) return;
+    const mainTarget = this._musicMainVolumeBeforeBigWinDuck ?? this._musicTargetVolume();
+    this._musicMainVolumeBeforeBigWinDuck = null;
+    this.howl.fade(this.howl.volume(this.musicId), mainTarget, BIG_WIN_UNDUCK_MS, this.musicId);
+
+    if (this.musicIntenseId !== null) {
+      const intenseTarget = this._musicIntenseVolumeBeforeBigWinDuck ?? 0;
+      this._musicIntenseVolumeBeforeBigWinDuck = null;
+      this.howl.fade(this.howl.volume(this.musicIntenseId), intenseTarget, BIG_WIN_UNDUCK_MS, this.musicIntenseId);
+    }
+
+    clearTimeout(this._bigWinRestoreTimer);
+    this._bigWinRestoreTimer = setTimeout(() => {
+      this._bigWinRestoreTimer = null;
+      this._resumeIntensityCooldown();
+    }, BIG_WIN_UNDUCK_MS);
+  }
+
+  // Schedules a Big Win's entry to land on the next 8th-note boundary of the
+  // currently-playing musicMain, rather than firing the instant the on-reel
+  // celebration happens to finish — the anticipation beat this creates is deliberate.
+  // Pauses the small-win intensity cooldown immediately (before the delay, not after)
+  // so it can't fire mid-anticipation or mid-duck and fight the duck/restore fades
+  // over the same Howler ids. Resolves once the duck has actually started — i.e.
+  // right when the caller should fire the riser and reveal the widget, not after the
+  // duck's own fade finishes, so both land on the same beat.
+  scheduleBigWinEntry() {
+    this._pauseIntensityCooldown();
+    const delay = this._msToNextEighth();
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        this._duckMusicForBigWin();
+        resolve();
+      }, delay);
+    });
   }
 
   // --- Win mechanics ---
@@ -442,14 +622,28 @@ class ThemeAudio {
 
   // --- Big win climax ---
 
+  // No longer ducks Main/Intense itself — scheduleBigWinEntry()'s
+  // _duckMusicForBigWin() already hard-ducked both to silence right before this is
+  // called (both fire from the same quantized-entry moment; see GameController's
+  // blackout branch). Also starts musicBigWin (optional — see _findMusicSpriteName())
+  // in the same breath as the riser, so the dedicated Big Win music bed and the riser
+  // land "on beat" together, not independently timed. musicBigWin is scaled like the
+  // other music layers (fader/trim/busMusic — see _musicTargetVolume()), not treated
+  // as a plain one-shot SFX, since it's still "the music" for volume-control purposes.
   playBigWinRiser() {
     this.riserId = this._play("winBigRiser");
-    this._duckMusic();
+    if (this._musicBigWinSpriteName) {
+      this.musicBigWinId = this._play(this._musicBigWinSpriteName, this._scaledMusicVolume());
+    }
   }
 
   // Stops the riser and, from its own stop callback, immediately fires the riser-end
-  // sting — so winBigRiserEnd is a direct consequence of winBigRiser stopping, not
-  // just a sequential call. Music comes back up (fade-in) at the same moment.
+  // sting and the curtained-exit music restore — so both are a direct consequence of
+  // winBigRiser stopping, not a sequential call, and the sting's tail masks the
+  // restore fade coming back in (see _restoreMusicAfterBigWin()). musicBigWin (if it
+  // was started) is cut off in the same synchronous moment the riser's own stop is
+  // issued — it stopped "on beat" with the riser starting, so it stops with it too,
+  // rather than being faded out separately.
   stopBigWinRiser() {
     if (!this.ready || !this.howl || this.riserId === null) return;
     const id = this.riserId;
@@ -458,28 +652,16 @@ class ThemeAudio {
       "stop",
       () => {
         this._play("winBigRiserEnd");
-        this._unduckMusic();
+        this._restoreMusicAfterBigWin();
       },
       id
     );
     this.howl.stop(id);
-  }
 
-  // -3dB / 1s fade-out on musicMain while the riser plays, so it doesn't fight the
-  // riser for space. Captures the current volume rather than assuming 1.0, so it
-  // restores to wherever the music actually was.
-  _duckMusic() {
-    if (!this.howl || this.musicId === null || !this.howl.playing(this.musicId)) return;
-    const currentVolume = this.howl.volume(this.musicId);
-    this._musicVolumeBeforeDuck = currentVolume;
-    this.howl.fade(currentVolume, currentVolume * dbToGain(MUSIC_DUCK_DB), MUSIC_DUCK_MS, this.musicId);
-  }
-
-  _unduckMusic() {
-    if (!this.howl || this.musicId === null) return;
-    const restoreTo = this._musicVolumeBeforeDuck ?? this._musicTargetVolume();
-    this._musicVolumeBeforeDuck = null;
-    this.howl.fade(this.howl.volume(this.musicId), restoreTo, MUSIC_DUCK_MS, this.musicId);
+    if (this.musicBigWinId !== null) {
+      this.howl.stop(this.musicBigWinId);
+      this.musicBigWinId = null;
+    }
   }
 
   // One-shot stinger the instant the big win overlay screen appears.

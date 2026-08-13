@@ -6,7 +6,37 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 33
+Read this file first in any new session on this project. It reflects the state after Step 36
+(Egypt, Football, China, Gangster, and Mexico all refreshed to the same `musicMain_<bpm>`/
+`musicIntense_<bpm>`/`musicBigWin` convention Arcade's v02 bank introduced in Step 35 — Egypt and
+Gangster 100 BPM, Football/Mexico 130 BPM, China 120 BPM. Every theme with a real audio bank is
+now on this convention except Neon Drive (no refreshed bank provided for it yet). Football needed
+a naming fix (`musicMain` → `musicMain_130`, to match its own `musicIntense_130`); Mexico went
+through several reverts first on a suspected bad export, before the real cause turned out to be a
+stale mp3 HTTP cache in this project's own testing (see "Known environment gotchas" item 11) —
+once both the JSON *and* the mp3 were properly cache-busted together, and a new
+`howl.duration()` cross-check confirmed the right buffer was loaded, Mexico verified cleanly with
+the exact same bytes already tried before. See "Refreshing Egypt, Football, China, Gangster, and
+(eventually) Mexico to the Step 35 convention (Step 36)" below).
+Before that: Step 35
+(Arcade's bank refreshed again to `arcadeSounds_v02` — `musicMain`/`musicIntense` are now
+`musicMain_114`/`musicIntense_114` (BPM embedded in the sprite name itself, the confirmed
+go-forward convention for Step 34's dynamic BPM parsing), and a new `musicBigWin` sprite plays
+alongside `winBigRiser` as a dedicated Big Win music bed. `ThemeAudio._findMusicSpriteName()`
+now resolves music sprites dynamically (bare name or `"_<bpm>"`-suffixed) instead of the old
+hardcoded `"musicMain"`/`"musicIntense"` literals; `busRouting.js`'s `busMusic` rule became a
+regex to match either form, now including `musicBigWin`. See "BPM-in-sprite-name + musicBigWin:
+refreshing Arcade to v02 (Step 35)" below).
+Before that: Step 34
+(a Big Win's entry now waits for the next musical 8th-note of the currently-playing `musicMain`
+before firing — `audioUtils.js`'s new `parseBpmFromPath()` regex-parses a BPM from the theme's
+audio source filename (falling back to 120), `ThemeAudio._msToNextEighth()` computes the delay
+via `Howler.seek()`, and `scheduleBigWinEntry()` pauses the Step 30 intensity cooldown, waits out
+the delay, then hard-ducks both music layers to silence (100ms) right as the riser/widget fire.
+`stopBigWinRiser()` now fades both layers back from silence over 2000ms — masked by
+`winBigRiserEnd`'s own tail — once that completes, resuming the paused cooldown. See
+"BPM-quantized Big Win entry with a hard duck/curtained-exit restore (Step 34)" below).
+Before that: Step 33
 (the black screen between a theme's fade-to-black and fade-in — previously as short as ~333ms or
 as long as ~800ms depending on how large that theme's assets were — is now unified to a 1000ms
 floor via `ThemeTransition`'s `BLACK_HOLD_MIN_MS`, run concurrently with the actual load work
@@ -2083,6 +2113,32 @@ floating dock). **The floating dock was chosen.** What that means concretely:
     **If anything else ever gets added near a cabinet edge or corner, measure
     `getBoundingClientRect()` against both fixed panels at multiple viewport sizes before
     assuming it fits** — don't trust that "nothing overlapped before" means nothing will now.
+11. **Item 1's stale-cache gotcha applies to binary audio assets too, not just HTML/CSS/JS —
+    and it's far more dangerous there because Howler decodes whatever bytes it gets with zero
+    validation against the JSON describing them.** Refreshing a theme's bank means updating *two*
+    files at once (`src/audio/<theme>Sounds.json` and `assets/23/sounds/<theme>Sounds.mp3`) — it's
+    easy to remember to `fetch(jsonPath, {cache:'reload'})` before testing (the JSON's content is
+    directly inspectable, so a stale copy is usually obvious) and forget the mp3 (opaque bytes,
+    no direct way to eyeball whether it's stale). The result: Howler decodes an *old* mp3 against
+    a *new* JSON's sprite offsets — every `[start, duration]` in the fresh JSON now points at
+    whatever happens to be at that timestamp in the *wrong* audio file, which can very plausibly
+    sound like "the wrong sprite entirely" or "everything scrambled past some point," not just a
+    small timing error. This is a silent failure — no console error, no failed fetch, Howler has
+    no way to know the buffer doesn't match the sprite map it was given. Caught concretely in
+    Football's Step-35-convention refresh: `_musicMainSpriteName` resolved correctly
+    (`"musicMain_130"`), the JSON's offsets were correct, and it *still* played wrong content,
+    because the browser was serving the mp3 from before that same refresh
+    (`fetch()`'s default cache mode returned the 4,129,763-byte original file; the actual new file
+    on disk was 5,665,763 bytes). **Always cache-bust *both* files together** —
+    `fetch(jsonPath, {cache:'reload'})` **and** `fetch(mp3Path, {cache:'reload'})` — before testing
+    any theme-bank refresh, and confirm the fix landed by checking `themeAudio.howl.duration()`
+    against the JSON's own last sprite's `start + duration` (should be a close match, typically
+    within ~0.5s from trailing encoder padding/silence — a large mismatch means a stale buffer is
+    still loaded). **This most likely also explains item 7's unresolved "Mexico/Arcade silent"
+    mystery** — a stale-mp3 mismatch wouldn't necessarily present as literal silence, but "some
+    sprites play, others don't/sound wrong" is well within what a buffer/offset mismatch produces,
+    and item 7's own writeup already listed "the stale-cache gotcha" as a leading suspect before
+    this exact mechanism was confirmed.
 
 ---
 
@@ -2249,6 +2305,246 @@ from the fade-to-black's `transitionstart` to the fade-in's `transitionend`:
   regardless of theme (the ~34ms over the nominal 1000ms is normal `setTimeout`/event-loop
   scheduling slack, not theme-dependent). Total transition time is now a consistent ~1801ms for
   every theme. Zero console errors.
+
+## BPM-quantized Big Win entry with a hard duck/curtained-exit restore (Step 34)
+
+A Big Win's entry (the riser starting, the widget appearing) now waits for the next musical
+8th-note (half-beat) of the currently-playing `musicMain` before firing, instead of landing
+whenever the on-reel celebration animation happens to finish — a deliberate anticipation beat
+that also gives the entry a clean, silent moment to duck into. Fully additive to Step 30's
+vertical-layering system; the two are designed to interoperate (see "Pausing the intensity
+cooldown" below), not to replace each other.
+
+**Dynamic BPM parsing (`audioUtils.js`).** `parseBpmFromPath(path)` — a small regex helper,
+`/[_-](\d{2,3})(?=\.[a-z0-9]+$)/i` — pulls a 2-3 digit number immediately before a file's
+extension (e.g. `musicMain_124.mp3` -> `124`), falling back to `DEFAULT_BPM` (120) if none is
+found. `ThemeAudio.loadTheme()` calls this on `bank.src` (the theme's shared spritesheet path,
+e.g. `arcadeSounds.mp3`) and stores the result as `this._bpm`. No shipped bank's filename
+currently encodes a BPM — every theme resolves to the 120 default today, same "prepare the
+mechanism, inert until the asset supports it" contract as `winSmallDigits`/`musicIntense` before
+it; verified directly (`musicMain_124.mp3` -> 124, `musicMain-98.mp3` -> 98, a real bank path ->
+120, `null` -> 120) via the Browser pane before wiring it into the timing math.
+
+**The quantization math (`ThemeAudio._msToNextEighth()`).** `Howler.seek(musicId)` gets
+`musicMain`'s current playback position in seconds; `msPerEighth = (60000 / bpm) / 2`;
+`timeToNext = msPerEighth - ((seekSeconds * 1000) % msPerEighth)`. Returns 0 (fire immediately)
+if there's no music actually playing to measure against, per the formula given in the task spec
+exactly — including firing a full `msPerEighth` later (not 0) on the rare exact-boundary case,
+since that's what the formula literally produces.
+
+**Orchestration (`ThemeAudio.scheduleBigWinEntry()`, called via the `scheduleBigWinEntry()` audio
+hook from `GameController`'s blackout branch, right after the on-reel celebration and before
+`playBigWinIntro()`/`bigWinWidget.show()`):**
+1. Pauses the Step 30 intensity cooldown immediately (see below).
+2. Computes `_msToNextEighth()` and waits exactly that long (`setTimeout`).
+3. The instant it fires: hard-ducks both music layers to silence (`_duckMusicForBigWin()`,
+   100ms) and resolves — `GameController` then fires `playBigWinIntro()`/`bigWinWidget.show()`
+   in the same tick, so the riser/widget land on the same beat the duck does (measured ~1.6ms
+   apart in the Browser pane, i.e. same synchronous chain).
+
+**The hard duck.** Not the old dB-based partial duck (`_duckMusic()`/`_unduckMusic()`, now
+deleted) — `_duckMusicForBigWin()` captures each layer's *actual current* volume (whatever
+`musicIntensityWeight` mix it was really in — could be anywhere from all-`musicMain` to
+all-`musicIntense`, or genuinely mid-crossfade) and fades both to true 0 over `BIG_WIN_DUCK_MS`
+(100ms). `playBigWinRiser()` no longer ducks anything itself; the duck already happened.
+
+**The curtained exit.** `stopBigWinRiser()`'s existing "stop chains into `winBigRiserEnd`"
+callback now also calls `_restoreMusicAfterBigWin()` in the same breath — both music layers fade
+from silence back to *exactly* the volumes `_duckMusicForBigWin()` captured (not a freshly
+recomputed target) over `BIG_WIN_UNDUCK_MS` (2000ms), long enough that `winBigRiserEnd`'s own
+tail covers the crossfade coming back in, per the task's framing. `stopWinRollup("big")` already
+fires `stopBigWinRiser()` in the same zero-latency synchronous block as the counter hitting its
+target (see Step 23) — so this inherits that exact-millisecond timing for free, no new wiring
+needed there.
+
+**Pausing the intensity cooldown.** `_pauseIntensityCooldown()`/`_resumeIntensityCooldown()` are
+genuine pause/resume, not clear-and-restart: `_armIntensityCooldown()` (the renamed core of what
+`notifySmallWin()` used to do inline) now tracks a wall-clock `_cooldownDeadline`, so pausing
+mid-countdown captures the *true remaining* time and resuming re-arms with exactly that, not a
+fresh `SMALL_WIN_INTENSITY_COOLDOWN_MS`. This matters because the Big Win duck and the Step 30
+idle-fade-down both ultimately animate the same two Howler ids — without pausing, a cooldown
+that happened to be mid-countdown from an earlier small win could fire its own crossfade-to-0
+in the middle of the Big Win's hard duck/restore and fight it. Resumption is scheduled off
+`_restoreMusicAfterBigWin()`'s own `BIG_WIN_UNDUCK_MS` timer, so the cooldown only starts
+ticking again once the restore fade has actually finished settling.
+
+**Verified in the Browser pane**, two ways:
+- A full real gameplay flow (Super Bet -> Grand Win) with every relevant `ThemeAudio` method
+  spied for call time: `scheduleBigWinEntry` -> `_pauseIntensityCooldown` -> `_msToNextEighth`
+  (computed 228ms) -> `_duckMusicForBigWin` fired ~234ms later (228ms + ~6ms of normal
+  `setTimeout` slack) -> `playBigWinRiser` 1.6ms after that -> `stopBigWinRiser` exactly
+  8001.9ms later (matching `BIG_ROLLUP_MS`) -> `_restoreMusicAfterBigWin` 1.8ms after that ->
+  `_resumeIntensityCooldown` exactly 2000.2ms later (matching `BIG_WIN_UNDUCK_MS`). Final
+  settled volumes matched the pre-win resting state exactly (`musicMain` 0.9, `musicIntense` 0).
+- A targeted edge case: triggering a small win (arming the cooldown, crossfading to
+  `musicIntensityWeight=1`), waiting 2s, then triggering a Big Win mid-countdown. Confirmed the
+  pause captured the true ~7996ms remaining (not a fresh 10000ms); confirmed the duck/restore
+  correctly captured and restored the *actual* pre-duck per-layer volumes (`musicMain` 0,
+  `musicIntense` 0.9 — correct for a weight-1 mix, not the weight-0 resting values); confirmed
+  the cooldown resumed at ~7796ms remaining (7996ms minus elapsed) rather than restarting at
+  10000ms; confirmed the 100ms duck actually reaches silence (sampled post-fade, not just that
+  `.fade()` was called). Zero console errors throughout every run.
+
+## BPM-in-sprite-name + musicBigWin: refreshing Arcade to v02 (Step 35)
+
+Arcade's bank was refreshed again, from the sync drive's `arcadeSounds_v02.json`/`.mp3`
+(replacing the v01 refresh from Step 31) — this version changed the vertical-layering sprite
+names themselves and introduced a third music layer, both confirmed with the user first (per the
+Step 19 policy) before any code was written, since neither is a "fix the obvious typo" case:
+
+- **`musicMain`/`musicIntense` are now `musicMain_114`/`musicIntense_114`** — the BPM Step 34
+  parses is embedded directly in the sprite name, not (only) the shared spritesheet's file path.
+  Confirmed as the intended go-forward convention, not a naming slip.
+- **A new sprite, `musicBigWin`** (22s) — confirmed as a dedicated Big Win music bed, meant to
+  play "on beat" together with `winBigRiser`.
+- **`powerbetOn`/`powerbetOff`** — same lowercase-"b" regression as v01 (Step 31), fixed at the
+  source again (Drive original + project copy), same as last time.
+
+**Sprite-name resolution is now dynamic, not hardcoded.** `ThemeAudio._findMusicSpriteName
+(baseName)` looks for the bare name first ("musicMain"), then a `"<base>_<bpm>"` variant — every
+place that used to hardcode the literal `"musicMain"`/`"musicIntense"` strings (`_playMusicLoop()`,
+`_musicTargetVolume()`'s bus lookup) now goes through the resolved name, stored on
+`_musicMainSpriteName`/`_musicIntenseSpriteName`/`_musicBigWinSpriteName` once `_playMusicLoop()`
+runs. `busRouting.js`'s `busMusic` rule became a regex,
+`/^(musicMain|musicIntense|musicBigWin)(_\d{2,3})?$/`, to keep matching either form. A bank with
+no BPM in either the sprite name or the file path still resolves to `DEFAULT_BPM` exactly as
+before — this is additive, not a breaking change for Egypt/Mexico/Football/China/Neon
+Drive/Gangster's plain `musicMain` sprites.
+
+**BPM source priority.** `loadTheme()` still parses `bank.src` via `parseBpmFromPath()` first (the
+Step 34 fallback), but once `_playMusicLoop()` resolves the actual `musicMain`-family sprite name,
+`audioUtils.bpmFromSpriteName()` re-checks *that* name for a `"_<bpm>"` suffix and overrides
+`_bpm` if found — the sprite name is more specific (per-track) than the shared file path, so it
+wins when both are present. Arcade v02 resolves to 114 BPM this way (its file path has no number
+at all).
+
+**`musicBigWin` plays "on beat" with the riser by piggybacking on the same trigger, not a second
+quantization pass.** `playBigWinRiser()` — already firing at the Step 34 quantized entry point —
+now also starts `musicBigWin` (if the bank defines it) in the same call, so no new BPM-aware
+timing code was needed; it inherits Step 34's anticipation delay for free. Scaled like
+`musicMain`/`musicIntense` (fader × `MUSIC_VOLUME_TRIM` × busMusic gain via
+`_scaledMusicVolume()`), not a plain one-shot SFX, since it's still "the music" during the
+climax — also picked up by `refreshMusicVolume()`'s live fader/mixer reactivity, unweighted (it's
+an on/off third layer, not part of the `musicIntensityWeight` crossfade). `stopBigWinRiser()`
+stops it in the same synchronous moment the riser's own stop is issued, alongside (not chained
+through) the `winBigRiserEnd`/restore sequence — it started with the riser, so it ends with it too.
+
+**Verified in the Browser pane**, all against the real v02 bank (not a mock): confirmed
+`_musicMainSpriteName`/`_musicIntenseSpriteName`/`_musicBigWinSpriteName` resolved to
+`"musicMain_114"`/`"musicIntense_114"`/`"musicBigWin"` and `_bpm` resolved to `114` (not the
+`120` file-path fallback); a full Super-Bet-triggered Grand Win with the same method-spy
+instrumentation as Step 34 — computed delay 185.26ms (correctly `< msPerEighth` at 114 BPM,
+263.16ms), duck fired ~189ms later (188.6ms + slack), riser ran 8015.5ms, restore/resume timing
+consistent with Step 34's measurements — and final settled volumes exactly matching the pre-win
+resting state. Directly confirmed `musicBigWin` played alongside the riser at the correct
+fader-scaled volume (0.9, matching `_scaledMusicVolume()`) and that both `riserId`/`musicBigWinId`
+correctly cleared to `null` after `stopBigWinRiser()`. Zero console errors throughout.
+
+## Refreshing Egypt, Football, China, Gangster, and (eventually) Mexico to the Step 35 convention (Step 36)
+
+Egypt's bank was refreshed from the sync drive (`egyptSounds_v01`) — adds `musicIntense_100`,
+renames `musicMain` to `musicMain_100`, and adds a `musicBigWin` sprite, matching the exact
+convention Arcade's v02 bank introduced in Step 35. No naming fix needed this time (Egypt's
+`powerBetOn`/`powerBetOff` were already correctly cased) and no code changes either — Step 35
+already generalized sprite-name resolution, bus routing, and BPM parsing to handle any bank
+following this convention, and Egypt picked it up automatically.
+
+**Mexico's matching `mexicoSounds_v01` was reverted, not shipped.** It was initially copied in
+alongside Egypt's and looked structurally correct (same convention, resolved to
+`musicMain_130`/`musicIntense_130`/`musicBigWin`, timing math verified against real gameplay —
+see the now-superseded numbers this section used to report), but the user then flagged the actual
+audio as "completely baked" with "all sfx misplaced" once they listened to it in-game — the sprite
+offsets/durations in the JSON don't line up correctly with the actual content of the new mp3.
+This is exactly the class of bug the Browser-pane verification in this project *cannot* catch:
+everything checked here is structural/timing correctness (does the right sprite name resolve, does
+the delay math work out, does a `.fade()` land on the right volume at the right millisecond) —
+never whether the audio playing back actually sounds like what it's supposed to, since that
+requires a human ear. Reverted via `git checkout` back to the last-committed (pre-this-session,
+single plain-`musicMain`, no `musicIntense`/`musicBigWin`) Mexico bank, since it was still
+uncommitted at the time. Mexico needs a corrected export from the source pipeline before this
+convention can be applied to it — Arcade and Egypt are unaffected and were not reported as broken.
+
+**Verified in the Browser pane** (Egypt only, the surviving change here): resolved to
+`musicMain_100`/`musicIntense_100`/`musicBigWin`, `_bpm` 100. A Super-Bet Grand Win computed a
+112ms entry delay (`< msPerEighth` at 100 BPM, 300ms), duck fired ~117ms later, riser ran
+8002.8ms, and final volumes settled at the theme's own busMusic-mix-scaled target (`musicMain`
+0.72 = 1 fader × 0.9 trim × 0.8 Egypt busMusic mix) with `musicBigWinId` correctly cleared. Zero
+console errors.
+
+One environment note, not a code issue: mid-test, a run kept re-triggering spins on its own after
+a Big Win finished — traced to the Browser pane's `read_page` accessibility-tree calls apparently
+generating stray keyboard events the page's own Space-to-spin shortcut (Step 29) picks up. Not
+reproducible through normal play; avoided afterward by using coordinate clicks instead of
+`read_page`+`ref` lookups.
+
+**Two more Mexico attempts, both also reverted, and a root-cause diagnosis.** A follow-up
+`mexicoSounds.json` from the sync drive had a `"mexicoSunds"` typo (key/`src`/`id` all missing the
+"o") — confirmed with the user and fixed at the source before importing, same Step 19 policy as
+always. That import loaded and ran cleanly (structurally — `_musicMainSpriteName` etc. all
+resolved, a full Big Win sequence ran with zero console errors), but a checksum comparison
+against a *third* attempt showed the mp3 bytes were byte-identical to the one already reverted —
+the underlying audio content hadn't actually changed between saves, only the JSON typo had been
+fixed, so it was never going to sound different. The user then pinpointed the actual symptom:
+looped `musicMain` was audibly playing straight through `reelStart`/`reelStop`/`reelTurbo` and
+into the very distinctive `winBigRiser` instead of looping back to its own declared boundary.
+That symptom shape — correct near the start of the file, increasingly wrong further in, wrong by
+a lot at 71s+ — is the signature of an **MP3 encode/decode timeline mismatch**: Howler stops/loops
+a sprite purely by the `start`/`duration` milliseconds declared in the JSON (confirmed by reading
+`loadTheme()` — `sprite[sound.name] = [sound.start * 1000, sound.duration * 1000]`, a verbatim
+pass-through, no computation on our side to have introduced this), but if the export tool computed
+those timestamps against a different decode of the mp3 than the browser's Web Audio API produces
+(common with VBR/LAME-padded MP3s — decoders don't always agree frame-for-frame), the *declared*
+boundary and the *actual* audio content at that timestamp drift apart, compounding the deeper into
+the file you go. Egypt and Arcade's `musicMain`/`musicIntense` loop correctly under the identical
+code, which rules out anything on the ThemeAudio.js/Howler-usage side — this is specific to how
+Mexico's particular mp3 was encoded/exported. Reverted again via `git checkout`, same as before.
+Fixing this needs a corrected export on the source side (a constant-bitrate re-encode is the usual
+fix for this class of issue) — not a JSON edit or a code change.
+
+**Resolution: the real bug was a stale mp3 HTTP cache in this project's own testing, not (only) a
+source-asset problem — see "Known environment gotchas" item 11 for the full mechanism.** It
+surfaced unambiguously during Football's refresh (`footballSounds_v01` — also needed one naming
+fix first, `musicMain` → `musicMain_130` to match `musicIntense_130`, confirmed with the user):
+structural checks all passed (`_musicMainSpriteName` resolved correctly, zero console errors) and
+it *still* played wrong content, because `fetch()`'s default cache mode was serving the *old*
+football mp3 (4,129,763 bytes) underneath the *new* JSON's offsets — a silent mismatch with no
+error, since Howler has no way to know the decoded buffer doesn't match the sprite map it was
+given. Explicitly cache-busting both files together
+(`fetch(jsonPath, {cache:'reload'})` **and** `fetch(mp3Path, {cache:'reload'})`) and re-testing
+fixed it immediately — the identical code, identical convention, just a genuinely fresh buffer.
+Football verified: `musicMain_130`/`musicIntense_130`/`musicBigWin`, `_bpm` 130, riser ran
+8010.9ms, `mainVol` settled at 0.675 (1 × 0.9 trim × 0.75 Football's busMusic mix).
+
+This meant Mexico's every previous test in this project (including the ones that reported it as
+broken) never actually confirmed a fresh mp3 buffer was loaded — so the "completely baked"/"all
+sfx misplaced" report may have been this exact caching artifact the whole time, not necessarily a
+genuine export-pipeline problem. Re-tried with the same `mexicoSounds_v01` bytes already sitting
+on the sync drive (checksum `fd9ad7f7...`, unchanged from every earlier attempt), this time with
+both files properly cache-busted *and* a new safety check — `themeAudio.howl.duration()` compared
+against the JSON's own last sprite's `start + duration` — added specifically to catch this class
+of mismatch going forward. Mexico verified: `musicMain_130`/`musicIntense_130`/`musicBigWin`,
+decoded duration 164.0s against an expected ~163.7s (a close match, confirming the right buffer),
+riser ran 8006.8ms, zero console errors. Re-added to the project (no longer reverted).
+
+China's bank (`chinaSounds_v01`) followed with no surprises: `musicIntense_120`/`musicMain_120`
+correctly paired from the start (no naming fix needed, unlike Football), `musicBigWin` added,
+`powerBetOn`/`powerBetOff` already correctly cased. Verified the same way — duration check (137.0s
+decoded vs. ~136.6s expected) before anything else, then a full Super-Bet Grand Win: riser ran
+8015.2ms, `mainVol` settled at 0.45 (1 × 0.9 trim × 0.5 China's busMusic mix), zero console errors.
+
+Gangster's bank (`gangsterSounds_v01`) followed the same clean pattern as China: `musicIntense_100`/
+`musicMain_100` correctly paired, `musicBigWin` added, `powerBetOn`/`powerBetOff` already correctly
+cased — no naming fixes needed. Duration check first (180.0s decoded vs. ~179.8s expected), then a
+full Super-Bet Grand Win: riser ran 8003.2ms, `mainVol` settled at 0.45 (1 × 0.9 trim × 0.5
+Gangster's busMusic mix), zero console errors.
+
+With this, every theme with a real audio bank (Arcade, Egypt, Football, China, Gangster, Mexico)
+is now on the Step 35 convention — Neon Drive is the only one left untouched (no `_v01` bank has
+been provided for it yet).
+
+**Every theme-bank refresh from here on should do the duration cross-check before any other
+verification** — it's cheap, catches the single most misleading failure mode in this whole
+pipeline, and every refresh in this step now does it as standard practice.
 
 ---
 
