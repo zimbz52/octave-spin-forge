@@ -28,7 +28,7 @@ const FAST_TIMING = { spinMs: 150, staggerMs: 0, landingMs: 350 };
 
 // Exact win-counter roll-up durations, per spec.
 const SMALL_ROLLUP_MS = 1500;
-const BIG_ROLLUP_MS = 8000;
+const BIG_ROLLUP_MS = 17000;
 
 export class GameController {
   constructor(reelEls, resultEl, winLineEl, celebrationOverlayEl, winCounterEl, winCounterValueEl, bigWinEls) {

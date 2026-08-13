@@ -27,6 +27,22 @@ const SYMBOL_SPRITE_MAP = {
 // pulled down by default, same rationale/mechanism as SystemAudio's -3dB UI trim.
 const SMALL_WIN_VOLUME_DB = -2;
 
+// Explicit, curated BPM per theme — the authoritative source now that theme banks no
+// longer embed a BPM in their music sprite names (musicMain_<bpm>/musicIntense_<bpm>
+// were reverted back to plain musicMain/musicIntense; see "Storing BPM values instead
+// of a sprite-name suffix" in ARCHITECTURE.md). Supplied manually per theme rather
+// than parsed — update this when a new/re-baked bank's tempo is confirmed. Falls back
+// to bpmFromSpriteName()/parseBpmFromPath()/DEFAULT_BPM (see _playMusicLoop()) for any
+// theme not listed here.
+const THEME_BPM = {
+  arcade: 114,
+  egypt: 100,
+  football: 130,
+  china: 120,
+  gangster: 100,
+  mexico: 130,
+};
+
 // Big Win quantized entry: both music layers are hard-ducked to silence together the
 // instant the entry lands on the next musical 8th-note (see scheduleBigWinEntry()),
 // snappy enough (100ms) to read as a hard cut rather than a fade. They're brought
@@ -44,7 +60,7 @@ const MUSIC_FADE_IN_MS = 2000;
 // several — every new small win resets the countdown back to the full amount rather
 // than extending it. Purely wall-clock (setTimeout), so it keeps ticking through reel
 // spins/animations rather than pausing for them.
-const SMALL_WIN_INTENSITY_COOLDOWN_MS = 10000;
+const SMALL_WIN_INTENSITY_COOLDOWN_MS = 20000;
 
 // Overall music trim, independent of the player-facing fader (which stays a full
 // 0-100% range) — knocks every actual musicMain gain down 10% on top of whatever the
@@ -95,9 +111,11 @@ class ThemeAudio {
     // animation mid-flight — it re-applies once the crossfade settles instead.
     this._musicCrossfadeActive = false;
     this._crossfadeSettleTimer = null;
-    // Parsed fresh on every loadTheme() from the bank's own src path — see
-    // parseBpmFromPath()/_msToNextEighth().
+    // Resolved fresh on every _playMusicLoop() — see THEME_BPM/_msToNextEighth().
     this._bpm = DEFAULT_BPM;
+    // The active bank's own src path, stashed by loadTheme() so _playMusicLoop() can
+    // fall back to parseBpmFromPath() on it once the actual music sprite name is known.
+    this._bankSrc = null;
     // Each music layer's actual volume right before a Big Win's hard duck, so
     // _restoreMusicAfterBigWin() can put it back exactly where it was (whatever
     // musicIntensityWeight mix it was actually in) rather than a freshly recomputed
@@ -142,7 +160,7 @@ class ThemeAudio {
       sprite[sound.name] = [sound.start * 1000, sound.duration * 1000];
       spriteNames.add(sound.name);
     });
-    this._bpm = parseBpmFromPath(bank.src);
+    this._bankSrc = bank.src;
 
     // Awaited all the way to onload/onloaderror (not just the JSON parse above) — a
     // caller gating a visual reveal on this (the fade lift) needs the audio to
@@ -198,6 +216,7 @@ class ThemeAudio {
     this._crossfadeSettleTimer = null;
     this._musicCrossfadeActive = false;
     this._bpm = DEFAULT_BPM;
+    this._bankSrc = null;
     this._musicMainVolumeBeforeBigWinDuck = null;
     this._musicIntenseVolumeBeforeBigWinDuck = null;
     clearTimeout(this._bigWinRestoreTimer);
@@ -254,11 +273,11 @@ class ThemeAudio {
     this._musicIntenseSpriteName = intenseName;
     this._musicBigWinSpriteName = this._findMusicSpriteName("musicBigWin");
 
-    // A BPM embedded in the sprite name itself (mainName's own "_<bpm>" suffix, if
-    // any) takes priority over the file-path-based parse loadTheme() already did —
-    // the more specific, per-track source of truth when both are available.
-    const spriteBpm = bpmFromSpriteName(mainName);
-    if (spriteBpm !== null) this._bpm = spriteBpm;
+    // BPM priority: the curated THEME_BPM entry for this theme (authoritative, kept
+    // up to date manually) first; a BPM embedded in the sprite name itself (mainName's
+    // own "_<bpm>" suffix, if a bank ever uses that convention again) second; the
+    // file-path-based parse of the bank's own src third; DEFAULT_BPM last.
+    this._bpm = THEME_BPM[this.currentTheme] ?? bpmFromSpriteName(mainName) ?? parseBpmFromPath(this._bankSrc);
 
     this.musicId = this.howl.play(mainName);
     this.howl.loop(true, this.musicId);

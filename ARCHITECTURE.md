@@ -6,7 +6,18 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 36
+Read this file first in any new session on this project. It reflects the state after Step 37
+(three independent tweaks: (1) the `musicMain_<bpm>`/`musicIntense_<bpm>` sprite-name-suffix
+convention from Steps 35-36 was reverted back to plain `musicMain`/`musicIntense` in all 6
+refreshed banks' JSON — BPM is now a manually-curated `THEME_BPM` constant in `ThemeAudio.js`
+instead, supplied per theme rather than parsed from a suffix; (2) `SMALL_WIN_INTENSITY_COOLDOWN_MS`
+raised 10s → 20s; (3) `BIG_ROLLUP_MS` raised 8s → 17s, verified duration-exact
+(`WinCounter.rollUp()` timed directly: 17004.7ms elapsed) with the gradual rise/climax-scale
+growth/brake-zone deceleration all confirmed unchanged, since `WinCounter.js`'s easing is
+parameterized on time *fraction* and win amount, never the raw duration. See "Storing BPM per
+theme instead of a sprite-name suffix; longer intensity cooldown; a 17s Big Win roll-up (Step 37)"
+below).
+Before that: Step 36
 (Egypt, Football, China, Gangster, and Mexico all refreshed to the same `musicMain_<bpm>`/
 `musicIntense_<bpm>`/`musicBigWin` convention Arcade's v02 bank introduced in Step 35 — Egypt and
 Gangster 100 BPM, Football/Mexico 130 BPM, China 120 BPM. Every theme with a real audio bank is
@@ -2545,6 +2556,59 @@ been provided for it yet).
 **Every theme-bank refresh from here on should do the duration cross-check before any other
 verification** — it's cheap, catches the single most misleading failure mode in this whole
 pipeline, and every refresh in this step now does it as standard practice.
+
+---
+
+## Storing BPM per theme instead of a sprite-name suffix; longer intensity cooldown; a 17s Big Win roll-up (Step 37)
+
+**BPM is no longer parsed from the music sprite's name.** Step 35's `musicMain_<bpm>`/
+`musicIntense_<bpp>` convention added real complexity (a naming fix needed for Football, an extra
+resolution path in `_findMusicSpriteName()`) for a value that changes rarely and is easy to just
+tell the assistant directly. All 6 refreshed banks' JSON (`arcadeSounds.json`, `egyptSounds.json`,
+`footballSounds.json`, `chinaSounds.json`, `gangsterSounds.json`, `mexicoSounds.json`) had
+`musicMain_<bpm>`/`musicIntense_<bpp>` reverted back to plain `musicMain`/`musicIntense` —
+`musicBigWin` never had a suffix and is unaffected. The BPM values themselves aren't lost: they're
+now a curated constant, `THEME_BPM` in `ThemeAudio.js` (`{ arcade: 114, egypt: 100, football: 130,
+china: 120, gangster: 100, mexico: 130 }`), supplied manually rather than parsed. Future
+theme-bank imports will have their BPM given directly (in chat) and added to this table, not
+baked into the bank's own filenames.
+
+`_playMusicLoop()`'s BPM resolution is now a priority chain: `THEME_BPM[currentTheme]`
+(authoritative) → `bpmFromSpriteName(mainName)` (kept as a fallback — still works if some future
+bank *does* use the suffix again) → `parseBpmFromPath()` on the bank's own `src` (stashed as
+`this._bankSrc` in `loadTheme()`, since by the time `_playMusicLoop()` runs and needs it, `bank`
+itself is out of scope) → `DEFAULT_BPM` (120, `parseBpmFromPath()`'s own built-in floor).
+`_findMusicSpriteName()` itself is unchanged — it already checked the bare name first, so the
+reverted banks resolve exactly like Football did before Step 35 touched it, no code changes needed
+there.
+
+**`SMALL_WIN_INTENSITY_COOLDOWN_MS` raised from 10000 to 20000** — the high-energy `musicIntense`
+layer now holds for 20s past the last small win (still a strict reset per win, not accumulated;
+see Step 30) before crossfading back down.
+
+**`BIG_ROLLUP_MS` raised from 8000 to 17000** (`GameController.js`, briefly 16000 mid-session
+before the user asked for one more second) — the Big Win counter now takes 17s to reach its
+target instead of 8s. No changes needed in `WinCounter.js`: its easing (`bigWinEasedProgress()`)
+and the digit-scale growth (`--climax-scale`, capped at 1.55×) are both parameterized purely on
+`t` (elapsed-time *fraction*, 0-1) and the win `amount`, never the raw duration in ms — changing
+`durationMs` just stretches the identical curve shape over a different wall-clock time, so the
+"gradual rise, subtle font growth, sharp brake at the very end" feel carries over unchanged, just
+slower. `scheduleBigWinEntry()`'s quantized-entry timing, the
+`BIG_WIN_DUCK_MS`/`BIG_WIN_UNDUCK_MS` duck/restore, and `winBigRiser`'s own explicit-stop-at-climax
+handling (Step 34) are all independent of `BIG_ROLLUP_MS` too — none needed touching.
+
+**Verified in the Browser pane:** on Arcade, confirmed `_musicMainSpriteName`/
+`_musicIntenseSpriteName` resolved to the bare `"musicMain"`/`"musicIntense"` and `_bpm` resolved
+to `114` from `THEME_BPM`, not a sprite-name suffix (which no longer exists in the JSON) or the
+120 file-path fallback. Confirmed `notifySmallWin()` now arms a 20000ms cooldown deadline exactly.
+For the roll-up: a real Super-Bet Grand Win sampled the counter's displayed value/`--climax-scale`
+every 300ms end to end — smooth, monotonically increasing digits throughout
+(494 → 994 → 1,521 → … → 24,280 → 24,732 → 24,925 → 24,989 → 25,000, visibly decelerating in the
+final samples exactly as the brake-zone math predicts) and `--climax-scale` climbing smoothly to
+its 1.550 cap. A separate, precise instrumented run — a bare `WinCounter.rollUp(25000, 17000,
+"big", …)` timed directly with `performance.now()` outside any game-flow overhead — measured
+**17004.7ms elapsed, landing on exactly "25,000"**, confirming the duration is exact, not just
+approximately in the right neighborhood. Zero console errors throughout.
 
 ---
 
