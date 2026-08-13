@@ -36,6 +36,16 @@ const MUSIC_DUCK_MS = 1000;
 // see _playMusicLoop().
 const MUSIC_FADE_IN_MS = 2000;
 
+// Adaptive vertical layering: a run of small wins keeps the high-energy musicIntense
+// layer up for this long past the *most recent* small win, not accumulated across
+// several — every new small win resets the countdown back to the full amount rather
+// than extending it. Purely wall-clock (setTimeout), so it keeps ticking through reel
+// spins/animations rather than pausing for them.
+const SMALL_WIN_INTENSITY_COOLDOWN_MS = 10000;
+
+// How long the musicMain <-> musicIntense crossfade itself takes, each direction.
+const MUSIC_CROSSFADE_MS = 1000;
+
 // Overall music trim, independent of the player-facing fader (which stays a full
 // 0-100% range) — knocks every actual musicMain gain down 10% on top of whatever the
 // fader is set to, rather than changing what the fader itself reports/controls.
@@ -45,6 +55,7 @@ class ThemeAudio {
   constructor() {
     this.howl = null;
     this.musicId = null;
+    this.musicIntenseId = null;
     this.ambientId = null;
     this.riserId = null;
     this.smallWinDigitsId = null;
@@ -58,6 +69,15 @@ class ThemeAudio {
     // musicMain's volume right before a duck, so the fade-in on winBigRiserEnd
     // restores exactly where it left off rather than assuming a hardcoded 1.0.
     this._musicVolumeBeforeDuck = null;
+    // 0 = musicMain fully active (resting state), 1 = musicIntense fully active.
+    // Themes with no musicIntense sprite simply never leave 0 — see notifySmallWin().
+    this.musicIntensityWeight = 0;
+    this._smallWinCooldownTimer = null;
+    // True for the MUSIC_CROSSFADE_MS window a crossfade is actively animating, so
+    // refreshMusicVolume() (fader/mixer changes) doesn't fight Howler's own fade
+    // animation mid-flight — it re-applies once the crossfade settles instead.
+    this._musicCrossfadeActive = false;
+    this._crossfadeSettleTimer = null;
   }
 
   // Loads and activates a theme's audio bank by name (e.g. "egypt"). Strictly
@@ -131,12 +151,19 @@ class ThemeAudio {
     }
     this.howl = null;
     this.musicId = null;
+    this.musicIntenseId = null;
     this.ambientId = null;
     this.riserId = null;
     this.smallWinDigitsId = null;
     this.ready = false;
     this._spriteNames = new Set();
     this._musicVolumeBeforeDuck = null;
+    this.musicIntensityWeight = 0;
+    clearTimeout(this._smallWinCooldownTimer);
+    this._smallWinCooldownTimer = null;
+    clearTimeout(this._crossfadeSettleTimer);
+    this._crossfadeSettleTimer = null;
+    this._musicCrossfadeActive = false;
   }
 
   // gameAmbLP (the ambient SFX bed), gameStart (if the bank has one), and musicMain
@@ -164,13 +191,30 @@ class ThemeAudio {
     // Strict singleton: never start a second overlapping music-loop instance.
     if (this.musicId !== null && this.howl.playing(this.musicId)) return;
     if (!this._spriteNames.has("musicMain")) return; // bank defines no music track
+
+    // musicIntense (optional — no bank defines it yet) is started in the same
+    // synchronous tick as musicMain, both looping, so the two layers stay phase-locked
+    // as one loop played twice rather than two independently-timed loops that merely
+    // share a tempo. It plays silently from the start; only its *volume* crossfades
+    // later (see notifySmallWin()) — starting it later on the first small win would
+    // not be phase-aligned with musicMain's already-in-progress loop position.
+    const hasIntense = this._spriteNames.has("musicIntense");
+
     this.musicId = this.howl.play("musicMain");
     this.howl.loop(true, this.musicId);
+    if (hasIntense) {
+      this.musicIntenseId = this.howl.play("musicIntense");
+      this.howl.loop(true, this.musicIntenseId);
+      this.howl.volume(0, this.musicIntenseId);
+    }
+    this.musicIntensityWeight = 0;
+
     // Fades in from silence up to the fader's current target (0 if the player already
     // muted the music) rather than snapping straight there — musicMain now starts
     // alongside gameStart instead of waiting for it, so this softens the moment they
     // overlap instead of both hitting full volume at once. Howler's fade() sets the
-    // starting volume itself; no separate .volume(0, id) call needed first.
+    // starting volume itself; no separate .volume(0, id) call needed first. musicIntense
+    // has nothing to fade in to yet (its target is 0 at rest) so it's left as-is.
     this.howl.fade(0, this._musicTargetVolume(), MUSIC_FADE_IN_MS, this.musicId);
   }
 
@@ -195,19 +239,30 @@ class ThemeAudio {
   }
 
   // _scaledMusicVolume() layered with the dev mixer's busMusic gain for the active
-  // theme — the actual number musicMain's Howler volume should be set to at any given
-  // moment (fade-in target, live fader/mixer changes, post-duck restore).
+  // theme — the combined fader/trim/bus-gain multiplier shared by *both* music layers.
+  // Each layer's actual Howler volume is this multiplied by that layer's own
+  // crossfade weight (musicIntensityWeight), not an independent number per layer —
+  // see _crossfadeToIntensity()/refreshMusicVolume().
   _musicTargetVolume() {
     return this._scaledMusicVolume() * this._busGain("musicMain");
   }
 
-  // Re-applies the current target volume to whatever's actually playing on musicId —
-  // called after either the fader or the dev mixer's busMusic slider changes, so a
-  // continuous loop reacts live instead of only picking up the new value next time it
-  // starts. No-ops harmlessly if music isn't playing yet.
+  // Re-applies the current target volume to whatever's actually playing on musicId
+  // (and musicIntenseId, weighted) — called after either the fader or the dev mixer's
+  // busMusic slider changes, so a continuous loop reacts live instead of only picking
+  // up the new value next time it starts. No-ops harmlessly if music isn't playing
+  // yet, and skips while a crossfade is actively animating (see
+  // _musicCrossfadeActive) so it doesn't fight Howler's own fade loop mid-flight —
+  // _crossfadeToIntensity()'s settle timer calls this again once the fade completes,
+  // which is when any fader/mixer change made during that window actually lands.
   refreshMusicVolume() {
     if (!this.howl || this.musicId === null) return;
-    this.howl.volume(this._musicTargetVolume(), this.musicId);
+    if (this._musicCrossfadeActive) return;
+    const multiplier = this._musicTargetVolume();
+    this.howl.volume((1 - this.musicIntensityWeight) * multiplier, this.musicId);
+    if (this.musicIntenseId !== null) {
+      this.howl.volume(this.musicIntensityWeight * multiplier, this.musicIntenseId);
+    }
   }
 
   // Same live-refresh idea as refreshMusicVolume(), for the ambient loop's own bus
@@ -278,6 +333,50 @@ class ThemeAudio {
   playReelTurbo() {
     const name = this._randomAvailableIndexedName("reelTurbo");
     if (name) this._play(name);
+  }
+
+  // --- Adaptive music: vertical layering (musicMain <-> musicIntense) ---
+
+  // Called once per small win (see audioHooks.js's playThemeSmallWin()). No-ops
+  // entirely if the active theme never started a musicIntense layer (see
+  // _playMusicLoop()) — vertical layering is opt-in per bank, same "silently does
+  // nothing until a bank defines the sprite" contract as winSmallDigits/powerBetOn.
+  // Each call resets a strict SMALL_WIN_INTENSITY_COOLDOWN_MS countdown back to its
+  // full length rather than extending an existing one — a burst of small wins holds
+  // the intense layer up for 10s past the *last* one, not 10s per win.
+  notifySmallWin() {
+    if (this.musicIntenseId === null) return;
+
+    if (this.musicIntensityWeight < 1) this._crossfadeToIntensity(1);
+
+    clearTimeout(this._smallWinCooldownTimer);
+    this._smallWinCooldownTimer = setTimeout(() => {
+      this._crossfadeToIntensity(0);
+    }, SMALL_WIN_INTENSITY_COOLDOWN_MS);
+  }
+
+  // Crossfades musicMain and musicIntense to the given intensity weight (1 = intense
+  // fully up, 0 = back to musicMain) over MUSIC_CROSSFADE_MS, using Howler's own
+  // fade() on each layer's actual current volume — not an assumed starting point, so
+  // a crossfade triggered mid-fade (rapid small wins) still animates smoothly from
+  // wherever the layers actually are rather than jumping.
+  _crossfadeToIntensity(weight) {
+    if (!this.howl || this.musicId === null || this.musicIntenseId === null) return;
+    this.musicIntensityWeight = weight;
+    const multiplier = this._musicTargetVolume();
+    const mainTarget = (1 - weight) * multiplier;
+    const intenseTarget = weight * multiplier;
+
+    this._musicCrossfadeActive = true;
+    this.howl.fade(this.howl.volume(this.musicId), mainTarget, MUSIC_CROSSFADE_MS, this.musicId);
+    this.howl.fade(this.howl.volume(this.musicIntenseId), intenseTarget, MUSIC_CROSSFADE_MS, this.musicIntenseId);
+
+    clearTimeout(this._crossfadeSettleTimer);
+    this._crossfadeSettleTimer = setTimeout(() => {
+      this._musicCrossfadeActive = false;
+      // Picks up any fader/busMusic mixer change that happened during the crossfade.
+      this.refreshMusicVolume();
+    }, MUSIC_CROSSFADE_MS);
   }
 
   // --- Win mechanics ---
@@ -387,19 +486,32 @@ class ThemeAudio {
     this._play("winBigT1");
   }
 
-  // --- Powerbet ---
+  // --- Powerbet (displayed as "Super Bet" in the UI as of its rename — see index.html) ---
 
-  // Not every bank defines powerBetOn/powerBetOff (chinaSounds.json is the first that
-  // does) — unlike playSymbolWin()'s Scatter fallback, there's no substitute sprite to
-  // fall back to here, so this just checks _spriteNames and no-ops quietly if missing
-  // rather than risking an undefined-sprite call into Howler. Safe to call freely on
-  // any theme; becomes live automatically the moment a bank defines these.
+  // The button reads "Super Bet" now, but every shipped bank's JSON still uses the
+  // original powerBetOn/powerBetOff sprite names ("don't change the JSON" was explicit
+  // — no bank was touched for this rename). superBetOn is preferred when a bank
+  // defines it (none do yet), falling back to powerBetOn otherwise — this is a
+  // deliberate, ongoing two-name transition (old banks keep working unmodified while
+  // new banks can adopt the new name whenever they're ready), not a naming mistake to
+  // fix at the source the way Step 19's policy covers; both names are intentionally
+  // supported at once. Not every bank defines either — no-ops quietly if neither is
+  // present, same guarded shape as before. Safe to call freely on any theme; becomes
+  // live automatically the moment a bank defines either name.
   playPowerBetOn() {
-    if (this._spriteNames.has("powerBetOn")) this._play("powerBetOn");
+    if (this._spriteNames.has("superBetOn")) {
+      this._play("superBetOn");
+    } else if (this._spriteNames.has("powerBetOn")) {
+      this._play("powerBetOn");
+    }
   }
 
   playPowerBetOff() {
-    if (this._spriteNames.has("powerBetOff")) this._play("powerBetOff");
+    if (this._spriteNames.has("superBetOff")) {
+      this._play("superBetOff");
+    } else if (this._spriteNames.has("powerBetOff")) {
+      this._play("powerBetOff");
+    }
   }
 }
 

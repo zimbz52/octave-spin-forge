@@ -7,7 +7,11 @@
 const BUS_RULES = [
   { bus: "busReelsTurbo", test: (name) => name.startsWith("reelTurbo") },
   { bus: "busReelsNormal", test: (name) => name.startsWith("reelStart") || name.startsWith("reelStop") },
-  { bus: "busMusic", test: (name) => name === "musicMain" },
+  // musicIntense is the optional high-energy layer of the adaptive vertical-layering
+  // system (see ThemeAudio.notifySmallWin()) — shares busMusic with musicMain so a
+  // single Dev-Mixer slider scales both layers together regardless of which is
+  // currently faded up.
+  { bus: "busMusic", test: (name) => name === "musicMain" || name === "musicIntense" },
   { bus: "busAtmosphere", test: (name) => name === "gameAmbLP" || name === "gameStart" },
   // winSmall01-04 (the flavor layer) and winSmallDigits/winSmallDigitsEnd (the counter
   // roll-up bed + its completion sting, see "Adding China" below) share this bus — both
@@ -21,7 +25,11 @@ const BUS_RULES = [
   { bus: "busWinsBig", test: (name) => name.startsWith("winBig") },
   // powerBetOn/powerBetOff split out from busWinsBig into their own bus — the toggle's
   // on/off cue is a distinct, player-facing control sound, not part of the win climax.
-  { bus: "busPowerBet", test: (name) => name.startsWith("powerBet") },
+  // Also matches superBetOn/superBetOff (the new preferred name since the button's
+  // rename to "Super Bet" — see ThemeAudio.playPowerBetOn/Off()); the bus itself keeps
+  // the name "busPowerBet" rather than being renamed too, since DEFAULT_THEME_MIXES
+  // (DevMixer.js) already has real baked-in values keyed to it for shipped themes.
+  { bus: "busPowerBet", test: (name) => name.startsWith("powerBet") || name.startsWith("superBet") },
 ];
 
 export const BUS_NAMES = BUS_RULES.map((rule) => rule.bus);

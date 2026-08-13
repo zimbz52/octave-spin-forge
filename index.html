@@ -45,19 +45,22 @@
             </button>
 
             <!-- Arms the next spin to bypass the normal Loss->Loss->Win cycle and land
-                 an instant Grand Win. No data-sfx-click: on/off get their own distinct
-                 powerBetOn/powerBetOff cues (main.js), not the generic uiClick. -->
+                 an instant Grand Win. Displayed as "Super Bet" — the internal id/class
+                 names and audio hook names are still "powerbet"/"powerBet" (unchanged
+                 on purpose, see ThemeAudio.playPowerBetOn/Off()), only the player-facing
+                 label changed. No data-sfx-click: on/off get their own distinct
+                 superBetOn/powerBetOn (fallback) cues (main.js), not the generic uiClick. -->
             <button
               id="powerbet-toggle-btn"
               class="powerbet-toggle"
               type="button"
               data-sfx-hover
               aria-pressed="false"
-              aria-label="Powerbet"
-              title="Powerbet — force the next spin into a Grand Win"
+              aria-label="Super Bet"
+              title="Super Bet — force the next spin into a Grand Win"
             >
               <span class="powerbet-toggle__icon" aria-hidden="true">&#9889;</span>
-              <span class="powerbet-toggle__label">Powerbet</span>
+              <span class="powerbet-toggle__label">Super Bet</span>
             </button>
           </div>
         </div>

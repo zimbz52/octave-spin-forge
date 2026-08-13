@@ -49,6 +49,9 @@ export function playThemeSmallWin(symbolIds) {
   console.log(`[audio hook] playThemeSmallWin(symbolIds=${JSON.stringify(ids)})`);
   themeAudio.playSmallWin();
   ids.forEach((symbolId) => themeAudio.playSymbolWin(symbolId));
+  // Vertical-layering "winSmalls" event — see ThemeAudio.notifySmallWin(). No-ops
+  // quietly on every theme until a bank defines a musicIntense layer.
+  themeAudio.notifySmallWin();
 }
 
 // symbolId: the blackout's symbol. Fires just the symbol-specific layer (no small-win

@@ -199,6 +199,26 @@ function wireGame() {
   return game;
 }
 
+// Lets Space trigger a spin from anywhere on the page — a dedicated, exclusive Spin
+// shortcut, not merely "Space activates whatever's focused" (that's already the
+// browser's native per-control behavior, and relying on it is exactly the bug this
+// fixes: after clicking Fast or Super Bet with the mouse, focus stays on that control,
+// so a later Space re-toggled *it* instead of spinning). preventDefault() is called
+// unconditionally, before any native per-control handling gets a chance to run, so
+// Space always means Spin regardless of what currently has focus. Wired only at the
+// end of init(), after the cabinet is actually playable, not from wireGame() —
+// wireGame() runs before the welcome screen/startup terminal are dismissed, and a
+// document-level key handler would fire straight through those gates' visual blocking
+// (unlike a real click, which they'd intercept), attempting a spin before a theme is
+// even chosen.
+function wireSpinKeyboardShortcut(spinBtn) {
+  document.addEventListener("keydown", (event) => {
+    if (event.code !== "Space") return;
+    event.preventDefault();
+    if (!spinBtn.disabled) spinBtn.click();
+  });
+}
+
 async function init() {
   systemAudio.init();
   wireGlobalUISfx();
@@ -275,6 +295,8 @@ async function init() {
   // is actually visible, so a reel can never end up visually shrunk relative to its
   // own content because of that timing gap.
   game.refreshLayout();
+
+  wireSpinKeyboardShortcut(document.getElementById("spin-btn"));
 }
 
 document.addEventListener("DOMContentLoaded", init);

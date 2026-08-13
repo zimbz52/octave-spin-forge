@@ -6,7 +6,31 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 28
+Read this file first in any new session on this project. It reflects the state after Step 31
+(Arcade's bank was refreshed from the sync drive's `arcadeSounds_v01` — the first bank to actually
+define `musicIntense`, used to verify Step 30 end-to-end with real audio rather than a mocked
+layer; one casing regression, `powerbetOn`/`powerbetOff`, was fixed to `powerBetOn`/`powerBetOff`
+at the source, both in the Drive original and the project copy, per the Step 19 policy. See
+"Refreshing arcadeSounds.json with musicIntense (Step 31)" below).
+Before that: Step 30
+(adaptive music — vertical layering: every theme's Howl instance can now carry a second,
+optional `musicIntense` sprite alongside `musicMain`. When present, both are started in the same
+synchronous tick so they stay phase-locked as two layers of one loop; each small win crossfades
+the mix toward `musicIntense` over 1s and holds it there for a strict, wall-clock 10s cooldown
+that resets on every new small win, then crossfades back to `musicMain`. Opt-in scaffolding, same
+"silently does nothing until a bank defines the sprite" contract as `winSmallDigits`/`powerBetOn`
+— Arcade is the first (and, as of Step 30 itself, only) bank to define `musicIntense` (see Step
+31). See "Adaptive music: vertical layering (Step 30)" below).
+Before that: Step 29
+(two small UI/UX changes: the Powerbet toggle is now labeled "Super Bet" to the player — internal
+ids/classes/audio-hook names deliberately still say "powerbet" — with `ThemeAudio.playPowerBetOn/
+Off()` now preferring `superBetOn`/`superBetOff` and falling back to the existing `powerBetOn`/
+`powerBetOff` (no theme JSON was touched); and Space now triggers a spin from anywhere on the page
+once the cabinet is actually playable — an *exclusive* Spin shortcut, unconditionally
+`preventDefault()`-ed so nothing else focused (Fast, Super Bet, the theme select) can intercept
+it, after an initial defer-to-native-focus version turned out to let exactly that happen. See
+"Super Bet rename + dual sprite names, and Space-to-spin (Step 29)" below).
+Before that: Step 28
 (a 7th theme, Gangster, was added via the standard pipeline — `assets/themes/gangster/`,
 `gangster-01-blue-revolver.svg`/`02-green-poker-hand`/`03-coral-grand-piano`/`04-purple-explosion`/
 `wild-gold-reload`, `bg_gangster.jpg`, registry entry, backdrop gradient. Its bank had two naming
@@ -1492,6 +1516,69 @@ removing it from here, not leaving a copy behind.
 
 ---
 
+## Super Bet rename + dual sprite names, and Space-to-spin (Step 29)
+
+**1. Powerbet → "Super Bet" (player-facing label only).** `index.html`'s toggle button's visible
+text, `aria-label`, and `title` all changed from "Powerbet" to "Super Bet". Its element id
+(`powerbet-toggle-btn`), CSS classes (`.powerbet-toggle`, `.powerbet-toggle--active`,
+`.cabinet__frame--powerbet`), the `--powerbet-accent` CSS variable, `main.js`'s
+`syncPowerbetUI()`/`powerbetBtn`, and the dev-mixer's `busPowerBet` bus name **were deliberately
+left unchanged** — purely internal identifiers with no player-facing meaning, and renaming
+`busPowerBet` specifically would have meant also migrating `DevMixer.js`'s already-shipped
+`busPowerBet` values for China/Gangster (Steps 17, 28) for zero functional benefit. **No theme
+JSON was touched** ("don't change the json so far" was explicit) — every existing bank still uses
+`powerBetOn`/`powerBetOff`.
+
+**2. Dual sprite-name support in `ThemeAudio.playPowerBetOn()`/`playPowerBetOff()`:** now check
+`superBetOn`/`superBetOff` first, falling back to `powerBetOn`/`powerBetOff` if a bank doesn't
+define the new name (none do yet). **This is deliberately a fallback, unlike Step 19's policy
+against them** — Step 19 was about *accidental* naming mismatches (a typo, words in the wrong
+order) that should be fixed at the source once, not defended against in code forever. This is a
+different situation: an intentional, ongoing two-name transition, where old banks legitimately
+keep working unmodified while new banks can adopt "superBet" whenever they're ready — exactly the
+"genuinely optional-by-design, not a naming mistake" carve-out Step 19's own policy already names
+(same category as `winSmallDigits` or `powerBetOn/Off` themselves being absent from most banks).
+`busRouting.js`'s `busPowerBet` rule was widened to also match `superBet*`, so a future
+`superBetOn`/`superBetOff` sprite routes to the same bus automatically.
+
+**Verified live** (after correctly cache-busting `main.js`/`ThemeAudio.js`/`audioHooks.js`/
+`busRouting.js` this time — an earlier verification pass hit exactly the stale-nested-import gotcha
+this file already warns about, produced a false "nothing played" result, and was redone properly):
+toggling the button on Egypt (which only has `powerBetOn`/`powerBetOff`, not the new names)
+correctly played `powerBetOn` then `powerBetOff` — confirming the fallback engages correctly.
+
+**3. Space triggers a spin from anywhere on the page.** New `wireSpinKeyboardShortcut()` in
+`main.js`, called at the very end of `init()` — deliberately not from `wireGame()`, which runs
+*before* the welcome screen/startup terminal are dismissed. A native click on the Spin button
+during that phase would be blocked by whichever overlay is visually on top, but a document-level
+keydown listener has no such protection — attaching it early would let Space attempt a spin
+before a theme is even chosen. Wiring it only once `game.refreshLayout()` (the last line of
+`init()`) has already run guarantees the cabinet is actually playable first.
+
+**Revised almost immediately: Space is an exclusive Spin shortcut, not "activate whatever's
+focused."** The first version deferred to native behavior whenever `document.activeElement` was
+an `INPUT`/`SELECT`/`BUTTON`/`TEXTAREA` — reported back as a real bug the same day: after clicking
+Fast or Super Bet with the mouse, focus stays on that control (normal browser behavior), so a
+*later* Space re-toggled *that* control instead of spinning, since the old guard was deliberately
+stepping aside for it. The fix removed the guard entirely — `event.preventDefault()` is now called
+unconditionally, before any native per-control Space handling gets a chance to run, so nothing
+else can ever intercept it. The listener is otherwise unchanged: `spinBtn.click()` — reusing the
+exact same click handler already wired in `wireGame()`, not duplicating any spin-triggering logic
+— guarded only by `!spinBtn.disabled`.
+
+**Verified live:** confirmed inert on the welcome screen and the startup terminal (both dispatched
+`keydown` events before the game was ready — used a real `KeyboardEvent` dispatch rather than the
+Browser pane's own key-simulation action, which was found not to produce an event with
+`code === "Space"` reaching `document` in this tool — a testing-tool quirk, not a bug in the
+listener itself, confirmed by the identical dispatch working correctly once the game *was* ready).
+Once past the terminal, with the *fixed* version: focused the Fast checkbox, dispatched Space —
+`fastToggle.checked` stayed `false` (native toggle suppressed) and the spin fired anyway; same
+result focusing the Super Bet button (`aria-pressed` stayed `"false"`) and the theme `<select>`
+(`.value` stayed `"egypt"`) — all three confirm Space now reaches Spin and *only* Spin, regardless
+of what's focused. Zero console errors throughout.
+
+---
+
 ## Theme switching / visual transition
 
 Both `ThemeTransition.swapTo(themeName)` (in-game dropdown) and `enterFromTerminal(themeName,
@@ -2007,6 +2094,98 @@ floating dock). **The floating dock was chosen.** What that means concretely:
   changes. See "Adding China" (Step 17) and "Adding Neon Drive" (Step 18) above.
 - The win-line dash (small win) is a single horizontal line; a big win's 9-tile blackout has no
   equivalent multi-line dash effect (explicitly deferred — see comment in `GameController.js`).
+
+## Adaptive music: vertical layering (Step 30)
+
+Every theme's Howl instance can now carry a second, fully optional music sprite —
+`musicIntense` — alongside the existing `musicMain`. Vertical layering: both are the *same*
+underlying loop at two different energy levels, played simultaneously and continuously, with
+only their relative volumes crossfading in and out in response to how well the player is
+currently doing. No shipped bank defines `musicIntense` yet; the whole system degrades to
+exactly today's single-track behavior (`musicIntensityWeight` simply never leaves 0) until one
+does. Same "prepare the mechanism, leave it inert until a bank defines the sprite" contract as
+`winSmallDigits`/`powerBetOn` before it.
+
+**Phase-locked start.** `ThemeAudio._playMusicLoop()` starts `musicMain` and (if the bank defines
+it) `musicIntense` in the same synchronous tick, both looped — `musicIntense` begins truly
+playing from the first instant, just silently (`.volume(0, id)`), rather than being started later
+on the first small win. Starting it later would not be phase-aligned with wherever `musicMain`'s
+loop position already was; starting both together makes them two layers of one loop rather than
+two independently-timed loops that merely share a tempo. `musicMain` keeps its existing 2s
+fade-in from silence (`MUSIC_FADE_IN_MS`); `musicIntense` has nothing to fade in to yet since its
+resting target is 0.
+
+**Trigger: `ThemeAudio.notifySmallWin()`.** Called from `audioHooks.js`'s `playThemeSmallWin()` —
+i.e. once per small win, the same "winSmalls" event that already fires the small-win layer and
+per-symbol layers. No-ops immediately if the active theme never started a `musicIntense` layer
+(`this.musicIntenseId === null`). Otherwise:
+- If not already fully crossfaded to intense (`musicIntensityWeight < 1`), starts a 1s crossfade
+  toward it (`_crossfadeToIntensity(1)`).
+- (Re)arms a strict 10s cooldown (`SMALL_WIN_INTENSITY_COOLDOWN_MS`, wall-clock `setTimeout`, not
+  paused for reel spins or any other animation) that crossfades back down to `musicMain`
+  (`_crossfadeToIntensity(0)`) if it ever elapses without a new small win. Each new small win
+  resets this back to the full 10s rather than extending an existing countdown — a burst of small
+  wins holds the intense layer up for 10s past the *last* one, not 10s stacked per win.
+
+**The crossfade itself (`_crossfadeToIntensity(weight)`).** `weight` is the logical 0-1 position
+(0 = `musicMain` fully up, 1 = `musicIntense` fully up), stored on `musicIntensityWeight` so
+`refreshMusicVolume()` (below) knows where things settled. The combined fader/trim/busMusic
+multiplier (`_musicTargetVolume()` — unchanged computation, now shared by both layers rather than
+just `musicMain`) is read once at the moment the crossfade starts; each layer is `Howl.fade()`-ed
+from its own *current* actual volume (not an assumed starting point, so a crossfade triggered
+mid-fade — a rapid run of small wins — animates smoothly from wherever it actually is rather than
+jumping) to `weight * multiplier` / `(1 - weight) * multiplier` respectively, over
+`MUSIC_CROSSFADE_MS` (1s). A `_musicCrossfadeActive` flag is set for that window and a settle
+timer calls `refreshMusicVolume()` again the instant it clears — see below for why.
+
+**Mixer/fader integration — "for free".** `busRouting.js`'s `busMusic` rule now matches
+`musicIntense` as well as `musicMain`, so both layers share the exact same Dev-Mixer slider and
+music fader; no new bus, no DevMixer/DevMixerPanel changes needed. `refreshMusicVolume()` (called
+by both the fader and `refreshBusLive("busMusic")`) now recomputes *both* layers' targets as
+`weight * multiplier` / `(1 - weight) * multiplier` using the live `musicIntensityWeight`, so a
+mixer or fader change lands correctly whichever side the crossfade is currently settled on — a
+track sitting at "100% intense" scales exactly like `musicMain` used to when the mixer moves. The
+one deliberate wrinkle: `refreshMusicVolume()` skips re-applying while `_musicCrossfadeActive` is
+true, so it doesn't fight Howler's own fade animation mid-flight (re-applying `.volume()` every
+tick would visibly stutter the crossfade); the crossfade's own settle timer calls it once more the
+moment the 1s window ends, so a mixer/fader change made *during* an active crossfade still lands
+correctly, just after that crossfade finishes rather than instantaneously.
+
+**Not touched:** `_duckMusic()`/`_unduckMusic()` (the Big Win riser duck) still only operate on
+`musicMain`'s id — if `musicIntense` is active when a Big Win riser starts, it currently keeps
+playing unducked. Undefined/unspecified behavior until a real bank exercises this combination;
+flagged here rather than guessed at, same spirit as the win-line-dash gap above.
+
+**Verified** by mocking a second real playing sound as a stand-in `musicIntenseId` (no bank
+defines a real `musicIntense` sprite yet to test against) via the Browser pane: confirmed the
+phase-locked start, the crossfade animating to the correct math-verified targets in both
+directions, the strict-reset cooldown, live fader/mixer reactivity at every crossfade weight
+(0, 0.5, 1), and a clean teardown/reset (no stray timer errors) on a mid-crossfade theme switch.
+Also confirmed a real in-game small win calls `notifySmallWin()` end-to-end with zero console
+errors, correctly no-op'ing on every current bank.
+
+## Refreshing arcadeSounds.json with musicIntense (Step 31)
+
+Arcade's bank was refreshed from the sync drive's `arcadeSounds_v01.json`/`.mp3` (both copied
+over the standard `src/audio/arcadeSounds.json` / `assets/23/sounds/arcadeSounds.mp3` paths,
+replacing the previous Step 21 refresh) — the first bank to actually define `musicIntense`,
+specifically so Step 30's vertical-layering system could be exercised end-to-end with real audio
+instead of a mocked stand-in layer.
+
+One naming issue, found before touching anything and confirmed with the user first per the Step
+19 policy: the new file had `powerbetOn`/`powerbetOff` (lowercase "b"), while every other bank —
+including Arcade's own previous version — uses `powerBetOn`/`powerBetOff`. Fixed at the source
+(both the Drive original and the project copy), not via fallback logic, consistent with every
+prior naming-oversight case in this project.
+
+**Live-verified in the Browser pane** (see Step 30 for the mocked-layer verification this
+supersedes): loading Arcade starts both `musicMain` and `musicIntense` simultaneously (confirmed
+both playing from the first instant, phase-locked, via the Signal Monitor and direct Howler
+inspection) at the correct resting split (musicMain audible, musicIntense silent). A real in-game
+small win crossfades to `musicIntense` over 1s, settling exactly at the expected multiplier
+(`weight=1`, `musicMain` volume 0, `musicIntense` volume = the full fader/trim/busMusic
+multiplier); left alone for the full 10s cooldown, it crossfades back down to `musicMain` just as
+cleanly (`weight=0`, back to the original split). Zero console errors throughout.
 
 ---
 
