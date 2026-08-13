@@ -6,7 +6,13 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 32
+Read this file first in any new session on this project. It reflects the state after Step 33
+(the black screen between a theme's fade-to-black and fade-in — previously as short as ~333ms or
+as long as ~800ms depending on how large that theme's assets were — is now unified to a 1000ms
+floor via `ThemeTransition`'s `BLACK_HOLD_MIN_MS`, run concurrently with the actual load work
+rather than added after it, so it never doubles up. See "Unifying the theme-transition
+black-screen hold to 1000ms (Step 33)" below).
+Before that: Step 32
 (the musicMain<->musicIntense crossfade duration from Step 30 is now a live, per-theme Dev Mixer
 setting — a new "Music Crossfade" slider/row (0-5s in 0.5s steps, default 1s) stored as
 `crossfadeMs` alongside each theme's bus multipliers in `DevMixer.js`, so it rides along with
@@ -2221,6 +2227,28 @@ dragging the slider to 3.0s and triggering a small win via `notifySmallWin()`, m
 via `performance.now()` polling `_musicCrossfadeActive`, took ~3012ms — matching the slider almost
 exactly. Confirmed `crossfadeMs` appears correctly in Export Config's output alongside Arcade's
 bus values. Reset to the 1s default afterward. Zero console errors.
+
+## Unifying the theme-transition black-screen hold to 1000ms (Step 33)
+
+The fade-to-black and fade-in themselves (`.fade-overlay`'s CSS `opacity 0.4s` transition) were
+always fixed — but the black screen *between* them, while the new theme's config/image/audio load
+(`ThemeTransition._transitionTo()`), used to last exactly as long as that load happened to take:
+measured (see below) anywhere from ~333ms (a small bank, e.g. Neon Drive) to ~800ms (a larger one,
+e.g. Arcade) depending on the theme. `BLACK_HOLD_MIN_MS = 1000` now puts a floor under that gap —
+a `setTimeout(1000)` runs *concurrently* with the load work (not after it) via `Promise.all([load
+Work, minHold])`, so the fade only lifts once both are done: a fast-loading theme still holds for
+the full second instead of flashing back early, and a theme slower than 1000ms (none currently are)
+would simply hold for as long as it actually takes — this is a floor, not a hard cap, since lifting
+before the load finishes would mean revealing an unready background/audio.
+
+**Measured before/after in the Browser pane** via real theme switches (not simulated), timing each
+from the fade-to-black's `transitionstart` to the fade-in's `transitionend`:
+- Before: black-hold gap ranged 333–800ms across 7 switches (theme-dependent), total transition
+  time averaged ~1339ms.
+- After: black-hold gap measured 1033.7–1033.9ms across 6 switches — effectively identical
+  regardless of theme (the ~34ms over the nominal 1000ms is normal `setTimeout`/event-loop
+  scheduling slack, not theme-dependent). Total transition time is now a consistent ~1801ms for
+  every theme. Zero console errors.
 
 ---
 

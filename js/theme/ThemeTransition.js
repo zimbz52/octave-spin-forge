@@ -21,6 +21,13 @@ function gradientBackdropFor(themeName) {
   return THEME_BACKDROPS[themeName] || DEFAULT_BACKDROP;
 }
 
+// The black screen holds for at least this long regardless of how fast the new
+// theme's config/image/audio actually load — unifies what would otherwise be a
+// load-time-dependent gap (as little as ~330ms for a small bank, 800ms+ for a large
+// one) into one consistent, deliberate beat. Never shortens an already-slower load;
+// see _transitionTo()'s Promise.all of the load work against this timer.
+const BLACK_HOLD_MIN_MS = 1000;
+
 // Resolves once `url` is fully decoded and ready to paint — not just "bytes
 // downloaded" (onload alone can still leave a decode hitch on the image's first
 // paint, especially for a large photo). Never rejects: a missing/broken image
@@ -68,17 +75,25 @@ export class ThemeTransition {
     // Screen is fully black now — safe to dismiss/swap without any of it being visible.
     if (startupTerminal) startupTerminal.dismiss();
 
+    // Runs concurrently with all the load work below, not sequentially after it — the
+    // fade only lifts once both this timer AND the load are done, so a fast-loading
+    // theme still holds for the full BLACK_HOLD_MIN_MS instead of flashing back early.
+    const minHold = new Promise((resolve) => setTimeout(resolve, BLACK_HOLD_MIN_MS));
+
     // The visual config has to resolve first — it's what tells us the theme's real
     // bgImagePath, if any — before the image (or the gradient fallback) can be applied.
     // The ensuing image preload and the fully independent theme audio load then run
     // side by side; the fade only lifts once both are done, so the background is
     // already fully loaded and centered the instant it becomes visible.
-    const config = await themeManager.loadTheme(themeName).catch((err) => {
-      console.error(err);
-      return null;
-    });
+    const loadWork = (async () => {
+      const config = await themeManager.loadTheme(themeName).catch((err) => {
+        console.error(err);
+        return null;
+      });
+      await Promise.all([this._applyBackdrop(themeName, config), themeAudio.loadTheme(themeName)]);
+    })();
 
-    await Promise.all([this._applyBackdrop(themeName, config), themeAudio.loadTheme(themeName)]);
+    await Promise.all([loadWork, minHold]);
 
     this.fadeOverlayEl.classList.remove("fade-overlay--active");
   }
