@@ -11,6 +11,18 @@ export function playTransitionWhoosh() {
   console.log("[audio hook] playTransitionWhoosh()");
 }
 
+// Fires the instant the user actually selects a new theme — from the init menu's
+// startup terminal or the in-game dropdown alike — not once the fade/reveal finishes.
+// Named "outro" for historical reasons (it used to fire at the reveal instead; see
+// ThemeTransition._transitionTo()), kept distinct from playTransitionWhoosh() above,
+// which is still an unwired placeholder marking the same moment on the visual side.
+// "uiTransition", per the systemSounds v1 refresh; randomly pitched per play by
+// SystemAudio.play().
+export function playTransitionOutro() {
+  console.log("[audio hook] playTransitionOutro()");
+  systemAudio.play("uiTransition");
+}
+
 // isFastMode: turbo mode replaces the standard reel start/stop sound sequence with a
 // single turbo cue, so this only plays the theme's slow reel-start when it's off.
 export function playReelStart(isFastMode) {
@@ -25,13 +37,27 @@ export function playReelStart(isFastMode) {
 
 // reelIndex: 0-based reel that just landed. symbol: the payline (middle-row) symbol
 // it landed on, so the future audio engine can pick a matching stop sound per symbol.
-// isFastMode: turbo's single start cue already covers the stop beat, so this is
-// suppressed in fast mode rather than firing 3 overlapping stop sounds.
+// isFastMode: suppressed for the time being — GameController quantizes Turbo reel
+// stops onto the 16th-note grid (see getTurboStopQuantizeDelay() below) so all 3
+// reels land in genuine unison, which would make 3 simultaneous reelStop samples read
+// as one locked-in hit rather than a phasey overlap... in principle. The existing
+// reelStop bank wasn't sound-designed with 3-at-once playback in mind, so this stays
+// off until a chime actually meant for that exists. The quantization itself (the
+// visual landing) is unaffected — only the audio call here is skipped.
 export function playReelStop(reelIndex, symbol, isFastMode) {
   console.log(`[audio hook] playReelStop(reelIndex=${reelIndex}, symbol="${symbol}", isFastMode=${!!isFastMode})`);
   if (!isFastMode) {
     themeAudio.playReelStop();
   }
+}
+
+// Milliseconds until the next 16th-note boundary of the currently-playing musicMain,
+// per the active theme's BPM — GameController adds this to a Turbo spin's own reel-
+// stop timing so the visual landing and the stop chime both snap onto the musical
+// grid instead of firing at a fixed, beat-agnostic offset. 0 (fire immediately) if
+// there's no music actually playing to measure against.
+export function getTurboStopQuantizeDelay() {
+  return themeAudio.getTurboStopQuantizeDelay();
 }
 
 // tier: the win tier id ("small1"..."small4", "big_blackout"), or omitted for a loss.
@@ -63,14 +89,13 @@ export function playThemeSymbolWin(symbolId) {
 
 // Fires the instant the win-line starts sweeping across the reels to connect the
 // winning symbols — i.e. the small line *before* the small-win celebration pop/blink
-// effects begin. Systemic (not per-theme), same as SystemAudio's other UI sounds:
-// a tiny tick, randomly pitched +/-1 semitone by SystemAudio.play() itself, so it
-// doesn't read identically every single small win. "smallWinLineTick" doesn't exist
-// in systemSounds.json yet — safe to call freely, becomes live automatically the
-// moment it's added (see SystemAudio.play()'s own guard).
+// effects begin. Systemic (not per-theme), same as SystemAudio's other UI sounds: a
+// tiny tick ("uiDash", per the systemSounds v1 refresh), randomly pitched +/-1
+// semitone by SystemAudio.play() itself, so it doesn't read identically every single
+// small win.
 export function playWinLineDash() {
   console.log("[audio hook] playWinLineDash()");
-  systemAudio.play("smallWinLineTick");
+  systemAudio.play("uiDash");
 }
 
 // Fires the instant the winning symbols start their scale/glow/twitch reaction,
@@ -79,15 +104,15 @@ export function playSymbolPulse() {
   console.log("[audio hook] playSymbolPulse()");
 }
 
-// Fires once the small-win celebration (SymbolCelebration's pop/glow overlay) has
-// fully finished — the audio accent for the 3-iteration .symbol--win blink pulse
-// that's still running on the payline tiles at that point (see the win-pulse
-// keyframes in styles.css). Systemic, same shape as playWinLineDash() above: a tiny
-// tick, randomly pitched per play by SystemAudio.play(), safe to call before
-// "smallWinBlinkTick" exists in systemSounds.json.
+// Fires once per iteration of the .symbol--win blink pulse (3 total per small win —
+// see GameController._wireSmallWinPulseAudio(), which drives these 3 calls off the
+// actual CSS animation's animationiteration events rather than a guessed delay; see
+// the win-pulse keyframes in styles.css for the visual side). Systemic, same shape as
+// playWinLineDash() above: a tiny tick ("uiPulse", per the systemSounds v1 refresh),
+// randomly pitched per play by SystemAudio.play().
 export function playSmallWinBlink() {
   console.log("[audio hook] playSmallWinBlink()");
-  systemAudio.play("smallWinBlinkTick");
+  systemAudio.play("uiPulse");
 }
 
 // Small-win money counter: prefers the active theme's own winSmallDigits/
@@ -183,4 +208,11 @@ export function playPowerBetOn() {
 export function playPowerBetOff() {
   console.log("[audio hook] playPowerBetOff()");
   themeAudio.playPowerBetOff();
+}
+
+// Fires on every enabled bet-selector arrow click (main.js). direction: "up" or
+// "down" — see SystemAudio.playBetClick() for the consecutive-click pitch-bend.
+export function playBetClick(direction) {
+  console.log(`[audio hook] playBetClick(direction="${direction}")`);
+  systemAudio.playBetClick(direction);
 }

@@ -1,4 +1,4 @@
-import { playTransitionWhoosh } from "../audio/audioHooks.js";
+import { playTransitionWhoosh, playTransitionOutro } from "../audio/audioHooks.js";
 import { themeManager } from "./ThemeManager.js";
 import { themeAudio } from "../audio/ThemeAudio.js";
 
@@ -68,6 +68,12 @@ export class ThemeTransition {
   }
 
   async _transitionTo(themeName, startupTerminal) {
+    // Fires the instant this method runs, i.e. the same tick as the user's actual
+    // selection (the dropdown's "change" handler and the startup terminal's
+    // waitForSelection() both call in here with nothing but a synchronous line or two
+    // in between) — not once the reveal finishes. See playTransitionOutro()'s own
+    // comment for why it's still named "outro" despite firing at selection time.
+    playTransitionOutro();
     playTransitionWhoosh();
     this.fadeOverlayEl.classList.add("fade-overlay--active");
     await this._waitForOpacityTransition();

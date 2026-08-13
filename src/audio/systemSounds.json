@@ -3,39 +3,64 @@
   "id": "systemSounds",
   "sounds": [
     {
+      "name": "moneyCounter02",
+      "start": 5,
+      "duration": 4.1
+    },
+    {
+      "name": "moneyCounterEnd",
+      "start": 10,
+      "duration": 1.095
+    },
+    {
       "name": "uiBet",
-      "start": 0,
+      "start": 12,
       "duration": 0.428
     },
     {
       "name": "uiClick",
-      "start": 1,
+      "start": 13,
       "duration": 0.42
     },
     {
+      "name": "uiDash",
+      "start": 14,
+      "duration": 0.385
+    },
+    {
       "name": "uiHover",
-      "start": 2,
+      "start": 15,
       "duration": 0.311
     },
     {
       "name": "uiMenuOff",
-      "start": 3,
+      "start": 16,
       "duration": 0.519
     },
     {
       "name": "uiMenuOn",
-      "start": 4,
+      "start": 17,
       "duration": 0.447
     },
     {
+      "name": "uiPulse",
+      "start": 18,
+      "duration": 0.575
+    },
+    {
       "name": "uiReelStart",
-      "start": 5,
+      "start": 19,
       "duration": 0.492
     },
     {
       "name": "uiSlider",
-      "start": 6,
+      "start": 20,
       "duration": 0.308
+    },
+    {
+      "name": "uiTransition",
+      "start": 21,
+      "duration": 1.82
     }
   ]
 }

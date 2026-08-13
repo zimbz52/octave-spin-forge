@@ -1,7 +1,7 @@
 import { systemAudio } from "./audio/SystemAudio.js";
 import { themeAudio } from "./audio/ThemeAudio.js";
 import { unlockAudioContext } from "./audio/audioUtils.js";
-import { playPowerBetOn, playPowerBetOff } from "./audio/audioHooks.js";
+import { playPowerBetOn, playPowerBetOff, playBetClick } from "./audio/audioHooks.js";
 import { AudioProfiler } from "./audio/AudioProfiler.js";
 import { DevMixerPanel } from "./audio/DevMixerPanel.js";
 import { ThemeTransition } from "./theme/ThemeTransition.js";
@@ -10,6 +10,7 @@ import { StartupTerminal } from "./theme/StartupTerminal.js";
 import { THEMES } from "./theme/themeRegistry.js";
 import { GameController } from "./game/GameController.js";
 import { getInitialDisplay, spinSequencer } from "./game/SpinSequence.js";
+import { wireBackgroundGuard } from "./backgroundGuard.js";
 
 function populateThemeSelect(themeSelectEl) {
   THEMES.forEach((theme) => {
@@ -122,6 +123,66 @@ function wireThemeSelect(themeTransition, devMixerPanel) {
   });
 }
 
+// Strict, ordered set of valid bet sizes — the arrows step through this array one
+// entry at a time (clamped at either end, not wrapping) rather than allowing an
+// arbitrary typed value. Not yet wired into actual payout math (SpinSequence.js's
+// tiers are still fixed amounts) — this is the UI/audio layer only, per the task
+// this shipped under.
+const BET_STEPS = [0.2, 0.5, 1.0, 2.0, 5.0, 10.0];
+const DEFAULT_BET_INDEX = 2; // $1.00
+
+// Renders the current bet value and wires the up/down arrows. Returns lock()/
+// unlock() so wireGame()'s spinBtn handler can grey out + functionally disable the
+// arrows for the exact duration of a spin (see the Spin Lock requirement) — native
+// `disabled` already blocks clicks; css/styles.css's `:disabled` rule adds the 50%
+// opacity + explicit pointer-events:none on top.
+function wireBetSelector() {
+  const valueEl = document.getElementById("bet-selector-value");
+  const decreaseBtn = document.getElementById("bet-decrease-btn");
+  const increaseBtn = document.getElementById("bet-increase-btn");
+
+  // A stale cached index.html (missing this markup) served alongside a fresh main.js
+  // would otherwise throw here and silently abort the rest of init() — including the
+  // welcome screen's click listener, further down. Degrade instead of crashing.
+  if (!valueEl || !decreaseBtn || !increaseBtn) {
+    console.warn("[main] Bet selector elements not found — skipping wiring (stale index.html cache?).");
+    return { lock() {}, unlock() {} };
+  }
+
+  let betIndex = DEFAULT_BET_INDEX;
+
+  function render() {
+    valueEl.textContent = `$ ${BET_STEPS[betIndex].toFixed(2)}`;
+  }
+
+  // Silent at either boundary — clicking "up" already at the max (or "down" at the
+  // min) changes nothing, so it stays silent rather than confirming a click that had
+  // no actual effect.
+  function step(direction) {
+    const nextIndex = betIndex + (direction === "up" ? 1 : -1);
+    if (nextIndex < 0 || nextIndex >= BET_STEPS.length) return;
+    betIndex = nextIndex;
+    render();
+    playBetClick(direction);
+  }
+
+  decreaseBtn.addEventListener("click", () => step("down"));
+  increaseBtn.addEventListener("click", () => step("up"));
+
+  render();
+
+  return {
+    lock() {
+      decreaseBtn.disabled = true;
+      increaseBtn.disabled = true;
+    },
+    unlock() {
+      decreaseBtn.disabled = false;
+      increaseBtn.disabled = false;
+    },
+  };
+}
+
 function wireGame() {
   const reelEls = Array.from(document.querySelectorAll(".reel"));
   const resultEl = document.getElementById("result-readout");
@@ -155,6 +216,8 @@ function wireGame() {
   );
   game.showInitial(getInitialDisplay());
 
+  const betSelector = wireBetSelector();
+
   fastToggle.addEventListener("change", (event) => {
     game.setFastMode(event.target.checked);
   });
@@ -187,13 +250,16 @@ function wireGame() {
   spinBtn.addEventListener("click", async () => {
     spinBtn.disabled = true;
     powerbetBtn.disabled = true;
+    betSelector.lock();
     await game.spin();
     // Auto-reset: only reached once the whole win sequence (if this was a Powerbet
     // spin) has fully played out and been collected — see the comment on
-    // syncPowerbetUI() above for why this specific timing matters.
+    // syncPowerbetUI() above for why this specific timing matters. The bet arrows
+    // unlock on this same trailing edge, not a moment sooner.
     syncPowerbetUI();
     spinBtn.disabled = false;
     powerbetBtn.disabled = false;
+    betSelector.unlock();
   });
 
   return game;
@@ -246,6 +312,7 @@ async function init() {
   const themeTransition = new ThemeTransition(document.getElementById("fade-overlay"));
   wireThemeSelect(themeTransition, devMixerPanel);
   const game = wireGame();
+  wireBackgroundGuard(game);
 
   // themeManager (ThemeManager.js) dispatches this the instant a theme's JSON config
   // resolves — during ThemeTransition's fade-to-black, before the backdrop/audio even

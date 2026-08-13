@@ -6,7 +6,41 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 37
+Read this file first in any new session on this project. It reflects the state after Step 40
+(three independent audio-timing fixes: `uiTransition` now fires the instant a theme is selected —
+init-menu terminal or in-game dropdown — instead of once the reveal finishes;
+`playSmallWinBlink()` ("uiPulse") now fires 3 times per small win, synced to the actual
+3-iteration `.symbol--win` CSS animation via its native `animationiteration` event rather than a
+single guessed-timing call; and `moneyCounter`'s pitch randomization was removed entirely —
+`moneyCounterEnd` now calls `howl.play()` directly instead of routing through `SystemAudio.play()`'s
+randomized-rate wrapper, matching the loop itself, which never randomized to begin with. See
+"Theme-select audio timing, synced small-win pulses, and an in-tune money counter (Step 40)"
+below).
+Before that: Step 39
+(`systemSounds` refreshed to v1 — `moneyCounter01/02/End`, `uiDash`, `uiPulse`, `uiTransition` —
+with `playWinLineDash()`/`playSmallWinBlink()`/the systemic small-win-counter fallback repointed
+at real sprites for the first time, and a new `playTransitionOutro()` hook. A new minimal
+`.bet-selector` (two bare `<button>` carets flanking a `"$ X.XX"` value, no button chrome) sits
+directly under the Fast toggle, stepping through a fixed `BET_STEPS` array (clamped, not wrapped)
+— not yet wired into actual payout math. Locks (grayed + `pointer-events:none`) for the exact
+duration of a spin, same lifecycle as `spinBtn`/`powerbetBtn`. Each click plays `uiBet` via a new
+`SystemAudio.playBetClick(direction)`, whose rate bends further from 1.0 the faster/more
+consecutively the arrows are clicked (capped 0.5-1.5, resets past a 500ms gap) — verified against
+the task's own worked example exactly. See "systemSounds v1 refresh, an elegant bet-size UI, a
+spin lock, and pitch-bending audio (Step 39)" below).
+Before that: Step 38
+(Turbo reel stops now snap their *visual* landing onto the track's 16th-note grid via
+`ThemeAudio.getTurboStopQuantizeDelay()`, generalized from Step 34's 8th-note helper — the stop
+chime itself was briefly un-suppressed in fast mode too, then reverted same-session at the user's
+request, since the existing `reelStop` bank wasn't sound-designed for 3-at-once playback; it stays
+silent in Turbo mode for now. A new `js/audio/rhythmTimers.js` tracks every such musically-quantized `setTimeout`
+(Turbo stops, Big Win anticipation) so a new `js/backgroundGuard.js` can flush them immediately —
+not silently drop them — the instant `document.visibilitychange` reports the tab hidden, alongside
+pausing/resuming reel spin animations via `ReelController.pauseSpinAnimation()`/
+`resumeSpinAnimation()`. Deliberately does not touch `Howler.mute()` — `main.js`'s pre-existing
+`wireAudioControls()` already handles that correctly, layered under the player's manual Master
+Mute. See "Reel Turbo 16th-note quantization + a background-tab throttling guard (Step 38)" below).
+Before that: Step 37
 (three independent tweaks: (1) the `musicMain_<bpm>`/`musicIntense_<bpm>` sprite-name-suffix
 convention from Steps 35-36 was reverted back to plain `musicMain`/`musicIntense` in all 6
 refreshed banks' JSON — BPM is now a manually-curated `THEME_BPM` constant in `ThemeAudio.js`
@@ -2150,16 +2184,42 @@ floating dock). **The floating dock was chosen.** What that means concretely:
     sprites play, others don't/sound wrong" is well within what a buffer/offset mismatch produces,
     and item 7's own writeup already listed "the stale-cache gotcha" as a leading suspect before
     this exact mechanism was confirmed.
+12. **A long-lived Browser-pane tab can accumulate state/errors unrelated to the current code** —
+    don't assume every console error reflects the code as it stands right now. This project's
+    Browser-pane tabs have shown at least two distinct ways to accumulate misleading state: real
+    clicks landing during a sensitive moment of page load, and item 5's stray-tab spawning. **When
+    a fresh code change produces an error that doesn't match anything you just touched, try a brand
+    new tab before assuming the code is wrong** — cheap to rule out. **But don't stop there if the
+    same symptom is independently reported by the actual user** (see item 13) — a tab artifact and
+    a real bug can produce the identical error message, and only one of them goes away on its own.
+13. **`TypeError: Cannot read properties of null (reading 'addEventListener')` was, in Step 39,
+    a REAL bug, not a tab artifact** — despite superficially matching item 12. Root cause: `index.html`
+    gained new `#bet-decrease-btn`/`#bet-selector-value`/`#bet-increase-btn` markup alongside the new
+    `wireBetSelector()` in `main.js`; if a browser ever serves a stale cached `index.html` (missing
+    that markup) alongside a fresh `main.js` (which unconditionally calls `.addEventListener()` on
+    those elements), `wireGame()` throws synchronously. `init()` has no top-level `.catch()`, so the
+    whole async function silently aborts — including the `await welcomeScreen.waitForStart()` line
+    further down, meaning **the welcome screen's "Initialize Engine" button never gets its click
+    listener wired at all**. Symptom on the user's end: "nothing happens when I click Initialize
+    Engine," with no visible error unless they specifically open devtools. **Fix applied:**
+    `wireBetSelector()` (`js/main.js`) now guards on all three elements being non-null and degrades
+    to a no-op `{ lock(){}, unlock(){} }` with a `console.warn` instead of throwing, so a markup/JS
+    version mismatch can no longer take down the entire init sequence. **Lesson: any DOM lookup done
+    inside `init()`'s synchronous path, before `welcomeScreen.waitForStart()` is awaited, is a single
+    point of failure for the whole app** — prefer guarding new lookups there, or wrap `init()` itself
+    in a `.catch()` that at least logs, rather than assuming a `getElementById` will always succeed
+    just because the current on-disk HTML matches.
 
 ---
 
 ## What's deliberately NOT implemented yet
 
 - Several `audioHooks.js` functions remain pure `console.log` placeholders with no real sound
-  wired in yet: `playWinStinger`, `playWinLineDash`, `playSymbolPulse`, `triggerWinClimax`,
-  `playTransitionWhoosh` (no whoosh sprite exists in `systemSounds.json` yet). Check
-  `audioHooks.js` directly for the current authoritative list — it changes as more sound design
-  lands.
+  wired in yet: `playWinStinger`, `playSymbolPulse`, `triggerWinClimax`, `playTransitionWhoosh`
+  (no whoosh-in sprite exists in `systemSounds.json` yet — Step 39 added its outro counterpart,
+  `playTransitionOutro()`, but not this one). `playWinLineDash()`/`playSmallWinBlink()` are no
+  longer on this list as of Step 39 (`uiDash`/`uiPulse`). Check `audioHooks.js` directly for the
+  current authoritative list — it changes as more sound design lands.
 - 6 themes exist (Egypt, Mexico, Vintage Arcade — `id: "arcade"` — Football, China, and Neon
   Drive). The system generalizes cleanly to dozens more: drop a new `<theme>Sounds.json`/`.mp3` at
   the established paths, add a `themes/<name>.json` stub, add one `{ id, label }` entry to
@@ -2609,6 +2669,245 @@ its 1.550 cap. A separate, precise instrumented run — a bare `WinCounter.rollU
 "big", …)` timed directly with `performance.now()` outside any game-flow overhead — measured
 **17004.7ms elapsed, landing on exactly "25,000"**, confirming the duration is exact, not just
 approximately in the right neighborhood. Zero console errors throughout.
+
+---
+
+## Reel Turbo 16th-note quantization + a background-tab throttling guard (Step 38)
+
+**Turbo reel stops now snap onto the track's 16th-note grid, both visually and audibly, instead
+of firing at a fixed offset.** `ThemeAudio._msToNextEighth()` (Step 34) was generalized into
+`_msToNextGridPoint(divisor)` — 2 for an 8th note, 4 for a 16th — so both the Big Win entry and
+this share one implementation rather than two near-duplicates. `getTurboStopQuantizeDelay()` (the
+new public entry point, exposed through `audioHooks.js`) wraps `_msToNextGridPoint(4)`.
+`GameController.spin()`'s fast-mode branch now waits the reel's normal `FAST_TIMING.spinMs` delay
+(plain, non-rhythmic — just game pacing), then samples `getTurboStopQuantizeDelay()` fresh at that
+moment and waits that too before calling `reel.stop(0, landingMs, onImpact)` — so both the reel's
+visual landing (which `reel.stop()`'s own delay controls the start of) and its stop chime (which
+fires on `onImpact`, when the landing animation first reaches the target) land on the same
+beat-aligned instant. Since `FAST_TIMING.staggerMs` is 0, all 3 reels share the identical base
+delay and each independently samples essentially the same quantize amount microseconds apart —
+verified live: all 3 `getTurboStopQuantizeDelay()` calls landed within 0.2ms of each other, and
+all 3 resulting `playReelStop()` calls within 0.3ms of each other, i.e. genuinely simultaneous, not
+just close.
+
+**The stop chime itself stays suppressed in fast mode, for now — a same-session reversal.** It was
+briefly un-suppressed (the reasoning being that quantization makes 3 simultaneous `reelStop`
+samples read as one locked-in hit rather than a phasey overlap, unlike the old un-quantized
+suppression's original concern), verified working, then reverted at the user's request: the
+existing `reelStop` bank wasn't sound-designed with 3-at-once playback in mind, so it goes back to
+silent in Turbo mode until a chime actually meant for that exists. `audioHooks.playReelStop()`
+keeps its `if (!isFastMode)` guard around `themeAudio.playReelStop()`. The quantization mechanism
+itself — the *visual* landing snapping to the 16th-note grid, computed via
+`getTurboStopQuantizeDelay()` — is untouched by this; only the audio call is skipped again.
+
+**`js/audio/rhythmTimers.js` (new file)** — a tiny registry (`setRhythmTimeout()`/
+`flushAllRhythmTimers()`) for exactly the timers that exist to hit a precise musical moment: the
+Turbo quantize wait above, and `scheduleBigWinEntry()`'s 8th-note anticipation delay (Step 34,
+switched from a raw `setTimeout` to `setRhythmTimeout`). `flushAllRhythmTimers()` doesn't silently
+drop pending callbacks — it runs each one *immediately* and cancels the real `setTimeout` — because
+the underlying game action (a reel locking into place, a Big Win entering) still has to happen even
+though the tab is hidden; only the "wait for the exact beat-aligned millisecond" nicety is worth
+skipping, since nothing about that timing would be perceptible while backgrounded anyway. This
+matters because a hidden tab's timers are subject to real, sometimes multi-second browser
+throttling — letting one of these fire "naturally" late would read as a jarring desync the instant
+the player returns; flushing immediately avoids that entirely rather than just capping how late it
+can be.
+
+**`js/backgroundGuard.js` (new file)**, wired from `main.js`'s `init()` right after `wireGame()`,
+listens for `document.visibilitychange`: on hidden, `flushAllRhythmTimers()` and
+`GameController.pauseAllReelAnimations()`; on visible, `resumeAllReelAnimations()` and
+`themeAudio.refreshMusicVolume()` (corrects any drift in the live fader/mixer volume that crept in
+while backgrounded, e.g. a crossfade's own settle timer firing late). `ReelController` gained
+`pauseSpinAnimation()`/`resumeSpinAnimation()`, both just `stripEl.getAnimations().forEach(anim =>
+anim.pause()/.play())` — `getAnimations()` uniformly covers the WAAPI spin-up ramp, the CSS
+cruise-loop, and a landing bounce, whichever happens to be active, so there's no need to track
+which one is currently driving the strip.
+
+**Deliberately does NOT call `Howler.mute()`.** `main.js`'s `wireAudioControls()` (pre-existing,
+not part of this step) already mutes/unmutes on `visibilitychange` via a `windowActive`/
+`masterMuted` combination that correctly layers auto-mute-on-hide *underneath* the player's own
+manual Master Mute toggle, never overriding it. A second, cruder `Howler.mute()` call from this
+new guard would risk exactly that: incorrectly un-muting audio the player deliberately silenced,
+the instant the tab becomes visible again. Verified live: with Master Mute manually engaged,
+simulating hidden → visible left `Howler._muted` `true` throughout and after — untouched by the
+new guard, exactly as intended.
+
+**Verified in the Browser pane**, all self-contained scripts (per this project's own
+tool-round-trip-latency gotcha — a first attempt at this exact test was invalidated by real
+multi-second gaps between separate tool calls, see "Known environment gotchas" item 2): a dummy
+10-second `setRhythmTimeout` fired in 0.1ms when `visibilitychange` fired with `document.hidden`
+forced `true`, confirming the flush is immediate, not merely "eventually." A real fast-mode spin's
+reel animation measured `"running"` → `"paused"` → `"running"` across a simulated hide/show cycle,
+and the interrupted spin still completed cleanly afterward (`spin-btn` re-enabled, a real result
+displayed) — nothing left stuck. `themeAudio.refreshMusicVolume()` confirmed called on the
+visible-again transition. Zero console errors throughout every run.
+
+---
+
+## systemSounds v1 refresh, an elegant bet-size UI, a spin lock, and pitch-bending audio (Step 39)
+
+**systemSounds refreshed to v1** (`systemSounds_v01` from the sync drive — no naming issues, key/
+`src`/`id` all correct) — adds `moneyCounter01`/`moneyCounter02`/`moneyCounterEnd`, `uiBet` (was
+already present), `uiDash`, `uiPulse`, `uiTransition`; `uiMenuOff`/`uiMenuOn` also newly present
+but unused so far (available for future wiring). Four call-site renames/additions in
+`audioHooks.js`, all going through the existing `SystemAudio.play()` wrapper (which already
+applies `randomizedPitchRate()`, ±~1 semitone — this is *why* the four sprites the task called out
+for pitch randomization needed no new pitch logic, just routing through `play()` rather than a
+direct `howl.play()`):
+- `playWinLineDash()`: `"smallWinLineTick"` (a placeholder name, no such sprite ever existed) →
+  `"uiDash"`.
+- `playSmallWinBlink()`: `"smallWinBlinkTick"` (same, placeholder) → `"uiPulse"`.
+- `playTransitionOutro()` (new hook): `"uiTransition"`, called from `ThemeTransition._transitionTo()`
+  right as the fade lifts (after `this.fadeOverlayEl.classList.remove(...)`'s moment) — an outro,
+  deliberately distinct from `playTransitionWhoosh()` at the top of the same method, which marks
+  the fade-to-black *starting*. `playTransitionWhoosh()` itself is untouched (still an unwired
+  placeholder — the task only specified an outro, not an intro sprite).
+
+**`SystemAudio`'s systemic small-win money-counter fallback renamed**: `playSmallWinDigits()`/
+`stopSmallWinDigits()` used to reference sprite names (`winSmallDigits`/`winSmallDigitsEnd`) that
+never actually existed in any systemSounds bank — dead placeholder names. Now: a new
+`_randomAvailableIndexedName()` helper (same pattern as `ThemeAudio`'s own) picks randomly between
+`moneyCounter01`/`moneyCounter02` for the loop (still bypassing `play()`'s pitch randomization,
+matching `ThemeAudio`'s never-randomized loop behavior — consistent regardless of which bank ends
+up serving a given theme), and `moneyCounterEnd` for the completion sting — which *does* go
+through `play()`, since it's one of the four sprites meant to randomize in pitch. This is the
+*systemic fallback* specifically (`audioHooks.js`'s `startSmallWinDigits()`/`stopSmallWinDigits()`
+choose it only when the active theme has no `winSmallDigits`/`winSmallDigitsEnd` of its own — see
+"Adding China" and Step 25); `ThemeAudio`'s per-theme mechanism (China's own bank) is untouched.
+
+**The bet-size UI** (`index.html`, `css/styles.css`): a new `.bet-selector` — two bare `<button>`
+elements (real, focusable, keyboard-operable elements, just reset to no border/background/padding
+so only their inline SVG caret glyph shows — "no clunky HTML buttons" was read as "no visible
+button chrome," not "avoid semantic buttons entirely") flanking a `<span>` showing the current bet
+(`"$ 1.00"`). Sits in a new `.kickplate__fast-col` wrapper alongside the existing Fast toggle,
+stacked vertically — this was the direct way to guarantee it lands "directly below" that specific
+control regardless of viewport width, rather than relying on implicit CSS grid column placement
+across two separate rows.
+
+**The logic** (`main.js`'s `wireBetSelector()`): a strict, ordered `BET_STEPS` array
+(`[0.20, 0.50, 1.00, 2.00, 5.00, 10.00]`), default index 2 (`$1.00`). The arrows step one entry at
+a time and *clamp* at either end rather than wrapping around — "cycle... up and down through this
+array" read as "step through," not "wrap from $10 back to $0.20," which felt like the wrong
+default for anything bet-adjacent even in a prototype; worth flagging in case wrap-around was
+actually intended. Not yet wired into actual payout math — `SpinSequence.js`'s tiers are still
+fixed amounts regardless of the displayed bet; this step is the UI/audio layer only.
+
+**The Spin Lock**: `wireGame()`'s `spinBtn` click handler already disabled `spinBtn`/`powerbetBtn`
+synchronously before `await game.spin()` and re-enabled them only after it resolved — `betSelector
+.lock()`/`.unlock()` (toggling `.disabled` on both arrow buttons) were added at those exact same
+two points, so the bet arrows share the identical lock lifecycle down to the millisecond, not a
+separately-timed approximation of it. `css/styles.css`'s `.bet-selector__arrow:disabled` sets both
+`opacity: 0.5` and an explicit `pointer-events: none` (native `disabled` already blocks
+clicks/focus on its own; the explicit rule is redundant-but-harmless belt-and-suspenders, matching
+the task's literal ask).
+
+**Dynamic pitch-bending audio** (`SystemAudio.playBetClick(direction)`, `BET_CLICK_*` constants):
+a *separate* code path from `play()`'s random-jitter pitch — this is a controlled, directional
+effect, so it calls `howl.play()`/`howl.rate()` directly. Tracks `_betClickRate` and
+`_betClickLastAt`; each call checks the gap since the last click: over `BET_CLICK_CONSECUTIVE_MS`
+(500ms) resets the rate to exactly 1.0, otherwise nudges it `BET_CLICK_RATE_STEP` (0.05) in the
+clicked direction, clamped to `[BET_CLICK_RATE_MIN, BET_CLICK_RATE_MAX]` (0.5-1.5). One rate value
+shared across both directions (not two independent up/down accumulators) — a same-window direction
+reversal bends smoothly back toward 1.0 and past it, rather than each direction maintaining its own
+separate "how far up/down have we gone" state; this was the more literal reading of the task's own
+worked example (`1.0, 1.05, 1.1` for 3 consecutive same-direction clicks) generalized to the
+mixed-direction case. `main.js`'s `wireBetSelector()`'s `step()` calls `playBetClick(direction)`
+unconditionally on every enabled click — even one that's clamped at an array boundary and doesn't
+actually move the displayed value — so the click always confirms audibly, matching "every time an
+enabled arrow is clicked" literally.
+
+**Verified in the Browser pane.** Direct, spied calls to `SystemAudio.playBetClick()` confirmed the
+exact rate sequence for `up, up, up, down` (rapid): `[1, 1.05, 1.1, 1.05]` — matching the task's
+own worked example precisely, including the direction-reversal case. A 15-click rapid "up" burst
+capped at exactly `1.5`; a 15-click "down" burst floored at exactly `0.5`; a single click after a
+600ms gap reset to exactly `1`. The Spin Lock: a real `spinBtn.click()`, checked in the very next
+tick, showed `spinBtn`/both bet arrows all `disabled: true` simultaneously; polled until the spin
+concluded, all three were `false` again, with `getComputedStyle` confirming `opacity: 0.5` /
+`pointer-events: none` on the arrows once the CSS transition itself had settled (an initial
+same-tick check misleadingly read `opacity: 1` — mid-transition, not a bug — resolved by checking
+past the transition's own 150ms). Boundary clamping confirmed exact: 10 rapid "down" clicks from
+`$1.00` landed on `$0.20` (not below); 10 rapid "up" clicks from there landed on `$10.00` (not
+above). The systemic money-counter fallback (Egypt, no theme-specific `winSmallDigits`) confirmed
+via a spied `howl.play()`: a real small win called `moneyCounter02` then `moneyCounterEnd`, in that
+order. `playTransitionOutro()` confirmed firing (console log) right as a theme's fade lifted. Zero
+console errors throughout every run — all in a **freshly-created tab**, notably: the original,
+long-lived tab from this same session had also logged a
+`TypeError: Cannot read properties of null (reading 'addEventListener')` that a brand-new tab
+(same URL, same code) did not reproduce, initially misdiagnosed as a tab-state artifact (see
+"Known environment gotchas" item 12). **This diagnosis was wrong** — the user went on to report
+the real symptom ("Initialize Engine does nothing") independently and repeatably; see the fourth
+follow-up bullet below and "Known environment gotchas" item 13 for the actual root cause and fix.
+
+**Same-session follow-up, three fixes/clarifications:**
+- **Bet-selector arrows now stay silent at either boundary.** `wireBetSelector()`'s `step()`
+  reordered: the bounds check now happens *before* `playBetClick()`, not after — clicking "up"
+  already at `$10.00` (or "down" at `$0.20`) changes nothing and confirms nothing. Verified: 5
+  clicks at each boundary produced exactly 0 `playBetClick()` calls.
+- **`moneyCounter01` removed from `src/audio/systemSounds.json`, `moneyCounter02` only, for now** —
+  the project's own copy only; the sync-drive original is untouched, so a future re-sync would
+  bring `moneyCounter01` back (this is a deliberate, temporary scope-narrowing, not a fix to an
+  upstream mistake). `SystemAudio._randomAvailableIndexedName("moneyCounter")` needed no code
+  change — it already degrades correctly to "the one match" when only one exists.
+- **`uiDash`/`uiPulse`/`uiTransition` re-verified end to end, all three confirmed genuinely
+  working** (a report that they were "missing" prompted this recheck): direct `systemAudio.play()`
+  calls for all three produced a real `howl.play()` + a `howl.rate()` within the expected
+  0.94-1.06 range (`uiDash` 1.0159, `uiPulse` 0.9638, `uiTransition` 1.0133 in one sampled run —
+  confirms `uiDash` *is* randomized, one of the things asked to double-check), and a real
+  gameplay small win independently triggered both `uiDash` and `uiPulse` via a spied `howl.play()`.
+  The likely explanation for not hearing them: `systemSounds.mp3` was refreshed *mid-session* (the
+  v1 refresh, earlier in this same step) — `uiPulse` and `uiTransition` sit at the *later* offsets
+  in the new file (18s/21s), so a browser tab that cached the old, shorter mp3 before the refresh
+  would seek past where that old file actually ends for exactly those two, while earlier-offset
+  sprites (`uiBet`, `uiClick`, etc.) would keep working — matching the selective "these specific
+  ones are missing" symptom exactly. Same mechanism as "Known environment gotchas" item 11.
+- **"Initialize Engine does nothing" was a real bug, since fixed.** `wireBetSelector()` threw on
+  `null.addEventListener()` whenever `index.html` (missing the new bet-selector markup) was stale
+  relative to `main.js` (already expecting it) — which silently aborted the rest of `init()`,
+  including the welcome-screen click-listener wiring further down, since `init()` has no top-level
+  `.catch()`. `wireBetSelector()` now guards on all three of its elements being non-null and
+  degrades to a no-op instead of throwing. See "Known environment gotchas" item 13 for the full
+  mechanism. If "nothing happens on click" ever resurfaces, hard-refresh first (this exact failure
+  mode needs a stale HTML+fresh JS mismatch to trigger), then check the console for the
+  `[main] Bet selector elements not found` warning this fix now logs.
+
+---
+
+## Theme-select audio timing, synced small-win pulses, and an in-tune money counter (Step 40)
+
+Three independent, user-directed audio-timing fixes, none of them touching the underlying sprites:
+
+- **`uiTransition` now fires the instant a theme is selected, not once the reveal finishes.**
+  `ThemeTransition._transitionTo()` called `playTransitionOutro()` as its very last line, right
+  before the fade lifted — so the cue landed roughly `BLACK_HOLD_MIN_MS` + load time after the
+  actual click, not "the moment of selection" as intended. Moved to the top of the method, right
+  alongside `playTransitionWhoosh()` (both now fire in the same synchronous tick the method is
+  entered, which is itself the same tick as the dropdown's `change` handler or the startup
+  terminal's `waitForSelection()` resolving — nothing meaningful happens in between). Verified via
+  console log ordering on both entry points: `playTransitionOutro()` now logs before
+  `playTransitionWhoosh()` and before any fade/load work, for both the init-menu terminal and the
+  in-game dropdown.
+- **`uiPulse` now fires 3 times per small win, synced to the actual 3-iteration `.symbol--win` CSS
+  animation** (`symbol-win-pulse`, 0.9s × 3, see styles.css) instead of firing once, well after the
+  celebration pop had already finished. `GameController._wireSmallWinPulseAudio()` fires the first
+  `playSmallWinBlink()` immediately when `highlightPayline()` applies the win class (matching the
+  animation's own start), then listens for the CSS animation's native `animationiteration` event on
+  one reference payline element to fire the other two — that event fires between iterations only
+  (twice, for 3 total), so no fixed-delay guessing is involved, and it self-corrects if anything
+  upstream ever changes the animation's duration or iteration count. Only one element is wired
+  (not all 3 winning tiles) because every winning tile gets the class in the same synchronous tick
+  and animates in lockstep — wiring all of them would have tripled the pulses instead of syncing
+  them. Verified live: a real small win logged exactly 3 `playSmallWinBlink()` calls, the first
+  ahead of `playWinLineDash()`, the other two interleaved with the win roll-up.
+- **`moneyCounter`'s pitch randomization removed entirely.** The looping counter itself
+  (`moneyCounter01/02`) never had pitch randomization to begin with (`SystemAudio.playSmallWinDigits()`
+  already called `this.howl.play()` directly, bypassing the `play()` wrapper's
+  `randomizedPitchRate()`) — but `moneyCounterEnd`, the completion sting, did go through the `play()`
+  wrapper and so was still randomizing ±1 semitone per the Step 39 spec. `stopSmallWinDigits()` now
+  calls `this.howl.play("moneyCounterEnd")` directly too, matching the loop. Verified with a
+  `Howl.prototype.rate`/`.play` spy across a real small win: zero `rate()` calls for either
+  `moneyCounter02` or `moneyCounterEnd`'s sound ids, while `uiDash`/`uiPulse`/`winSmall01`/etc. in
+  the same win still received their usual randomized rate — confirms the change is scoped to just
+  the money-counter family, not a global regression of `SystemAudio.play()`'s pitch jitter.
 
 ---
 

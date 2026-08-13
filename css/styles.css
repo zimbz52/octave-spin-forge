@@ -1496,6 +1496,75 @@ body {
   width: 100%;
 }
 
+/* Stacks the Fast toggle directly above the bet-size stepper, both centered in the
+   kickplate row's first 74px column — keeps them visually grouped as one "spin
+   settings" cluster regardless of how either one's own internal layout changes. */
+.kickplate__fast-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- Bet-size stepper ---------- */
+/* Deliberately not a bordered/backgrounded control — "sleek, minimal" means the value
+   reads like a label with two small clickable carets, not a boxed widget. Each arrow
+   is a real <button> (keyboard-operable, focusable) but reset to bare — no border,
+   background, or padding — so only the SVG glyph itself is visible. */
+.bet-selector {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  user-select: none;
+}
+
+.bet-selector__arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  margin: -3px;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s ease, opacity 0.15s ease, transform 0.06s ease;
+}
+
+.bet-selector__arrow:hover:not(:disabled) {
+  color: var(--cabinet-accent);
+}
+
+.bet-selector__arrow:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.bet-selector__arrow:focus-visible {
+  outline: 1px solid var(--cabinet-accent);
+  outline-offset: 2px;
+}
+
+/* The Spin Lock: grayed out and functionally inert for the exact duration of a spin —
+   see main.js's spinBtn click handler, which disables/re-enables these at the same
+   moments it does spinBtn/powerbetBtn. Native `disabled` already blocks clicks/focus
+   on its own; pointer-events:none is added explicitly anyway so even a stray hover
+   can't linger into a :hover-driven color change while locked. */
+.bet-selector__arrow:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: default;
+}
+
+.bet-selector__value {
+  min-width: 44px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-light);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Powerbet toggle ---------- */
 /* Occupies the same 74px kickplate column the old spacer held, keeping Spin centered.
    A real button (not a checkbox switch like Fast) since on/off need their own distinct

@@ -7,6 +7,7 @@
 import { dbToGain, parseBpmFromPath, bpmFromSpriteName, DEFAULT_BPM } from "./audioUtils.js";
 import { getBusForSprite } from "./busRouting.js";
 import { devMixer } from "./DevMixer.js";
+import { setRhythmTimeout } from "./rhythmTimers.js";
 
 // Our 5 generic symbols map onto the sprite-naming convention every theme's sound
 // bank is expected to follow (winSymbol01-04, winSymbolWild) — this mapping is part
@@ -507,16 +508,33 @@ class ThemeAudio {
 
   // --- Big Win quantized entry (BPM-synced anticipation + duck) ---
 
-  // Milliseconds from musicMain's *current* playback position to the next 8th note
-  // (half-beat), per the active theme's parsed BPM (_bpm, see parseBpmFromPath()).
-  // 0 if there's no music actually playing to measure against — scheduleBigWinEntry()
-  // then fires immediately rather than waiting on a position that doesn't exist.
-  _msToNextEighth() {
+  // Milliseconds from musicMain's *current* playback position to the next grid point
+  // `divisor` subdivisions per beat (2 = 8th note, 4 = 16th note), per the active
+  // theme's BPM (_bpm — see THEME_BPM/parseBpmFromPath()/bpmFromSpriteName()). 0 if
+  // there's no music actually playing to measure against — callers then fire
+  // immediately rather than waiting on a position that doesn't exist.
+  _msToNextGridPoint(divisor) {
     if (!this.howl || this.musicId === null) return 0;
     const seekSeconds = this.howl.seek(this.musicId);
     if (typeof seekSeconds !== "number") return 0;
-    const msPerEighth = 60000 / this._bpm / 2;
-    return msPerEighth - ((seekSeconds * 1000) % msPerEighth);
+    const msPerUnit = 60000 / this._bpm / divisor;
+    return msPerUnit - ((seekSeconds * 1000) % msPerUnit);
+  }
+
+  _msToNextEighth() {
+    return this._msToNextGridPoint(2);
+  }
+
+  _msToNextSixteenth() {
+    return this._msToNextGridPoint(4);
+  }
+
+  // Public entry point for GameController's Turbo reel-stop quantization (see
+  // "Reel Turbos 16th-Note Quantization" in ARCHITECTURE.md) — snaps a reel's stop
+  // (both its visual landing and its chime) onto the track's 16th-note grid the same
+  // way scheduleBigWinEntry() snaps the Big Win climax onto the 8th-note grid.
+  getTurboStopQuantizeDelay() {
+    return this._msToNextSixteenth();
   }
 
   // Hard-ducks both music layers to silence together — not the old dB-based partial
@@ -572,7 +590,10 @@ class ThemeAudio {
     this._pauseIntensityCooldown();
     const delay = this._msToNextEighth();
     return new Promise((resolve) => {
-      setTimeout(() => {
+      // setRhythmTimeout (not a raw setTimeout) so backgroundGuard.js can flush this
+      // immediately if the tab gets backgrounded mid-delay, rather than let a
+      // throttled background tab delay the Big Win's entry indefinitely.
+      setRhythmTimeout(() => {
         this._duckMusicForBigWin();
         resolve();
       }, delay);

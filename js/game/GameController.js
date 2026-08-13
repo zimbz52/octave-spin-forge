@@ -7,6 +7,7 @@ import { BigWinWidget } from "../effects/BigWinWidget.js";
 import {
   playReelStart,
   playReelStop,
+  getTurboStopQuantizeDelay,
   playWinStinger,
   playWinLineDash,
   playSymbolPulse,
@@ -17,6 +18,7 @@ import {
   playBigWinIntro,
   stopBigWinRiser,
 } from "../audio/audioHooks.js";
+import { setRhythmTimeout } from "../audio/rhythmTimers.js";
 
 // Standard mode: staggered stops, with room for the cruise loop and landing bounce
 // to actually read — 3rd reel finishes at 900 + 2*280 + 420 = 1880ms.
@@ -81,6 +83,19 @@ export class GameController {
     this.reels.forEach((reel) => reel.redrawIcons());
   }
 
+  // backgroundGuard.js calls these on document visibilitychange — pausing/resuming
+  // whatever's actively animating each reel (the spin-up ramp, the cruise loop, or a
+  // landing bounce) rather than letting it keep running invisibly (and, for the
+  // cruise loop specifically, indefinitely — CSS animations don't stop just because
+  // the tab is hidden) while the tab is backgrounded.
+  pauseAllReelAnimations() {
+    this.reels.forEach((reel) => reel.pauseSpinAnimation());
+  }
+
+  resumeAllReelAnimations() {
+    this.reels.forEach((reel) => reel.resumeSpinAnimation());
+  }
+
   async spin() {
     if (this.isSpinning) return;
     this.isSpinning = true;
@@ -104,8 +119,26 @@ export class GameController {
       // Audio hook fires on impact (when the reel first reaches its target), not
       // after the full landingMs bounce-settle — otherwise the stop sound lands
       // noticeably late relative to the 3 reels' actual visual stops.
-      return reel.stop(delay, timing.landingMs, () => {
-        playReelStop(reel.reelIndex, landedSymbol, this.fastMode);
+      const onImpact = () => playReelStop(reel.reelIndex, landedSymbol, this.fastMode);
+
+      if (!this.fastMode) return reel.stop(delay, timing.landingMs, onImpact);
+
+      // Turbo mode: both the reel's visual landing and its stop chime are snapped
+      // onto the track's 16th-note grid (see getTurboStopQuantizeDelay()) rather than
+      // firing at `delay` unconditionally — since every reel shares the same delay
+      // here (FAST_TIMING.staggerMs is 0), they all snap to the identical
+      // beat-aligned instant instead of independently drifting. The quantize amount
+      // is sampled fresh right when `delay` elapses (not at spin start), so it
+      // reflects musicMain's actual position at that moment. Wrapped in
+      // setRhythmTimeout (not a raw setTimeout) so backgroundGuard.js can flush it
+      // immediately if the tab gets backgrounded mid-wait.
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const quantizeDelay = getTurboStopQuantizeDelay();
+          setRhythmTimeout(() => {
+            reel.stop(0, timing.landingMs, onImpact).then(resolve);
+          }, quantizeDelay);
+        }, delay);
       });
     });
 
@@ -149,6 +182,7 @@ export class GameController {
         // Strict sequence: reels stopped -> dash connects -> symbols pulse -> (future
         // money counter picks up from here).
         const paylineEls = this.reels.map((reel) => reel.getPaylineSymbolEl()).filter(Boolean);
+        this._wireSmallWinPulseAudio(paylineEls[0]);
         playWinLineDash();
         await this.winLine.dash(paylineEls[1] || paylineEls[0]);
 
@@ -159,11 +193,6 @@ export class GameController {
         // Wild-assist tier plays both winSymbolWild and winSymbol01 together.
         playThemeSmallWin([...new Set(outcome.payline)]);
         await Promise.all([...paylineEls.map((el) => this.celebration.celebrate(el)), this.winLine.hide()]);
-
-        // Post-celebration: the payline tiles are still mid-blink (.symbol--win's
-        // 3-iteration pulse, see styles.css) at this point — this is the audio accent
-        // for that, fired once the celebration pop itself has finished.
-        playSmallWinBlink();
 
         await this.winCounter.rollUp(outcome.tier.winAmount, SMALL_ROLLUP_MS, "small");
       }
@@ -178,5 +207,26 @@ export class GameController {
     if (!this.resultEl) return;
     this.resultEl.textContent = text;
     this.resultEl.classList.toggle("result-readout--win", isWin);
+  }
+
+  // Ties playSmallWinBlink() to the actual .symbol--win CSS animation (3 iterations
+  // of symbol-win-pulse, see styles.css) instead of guessing at its timing with a
+  // fixed delay. Every winning tile gets the class in the same synchronous tick
+  // (highlightPayline(), above), so they animate in perfect lockstep — listening on
+  // just one reference element drives all 3 pulses without re-triggering per tile.
+  // animationiteration fires between iterations only (twice, for 3 total), so pulse 1
+  // fires immediately here and the other two ride that event; the listener detaches
+  // itself once it's fired its share, since the win class is cleared well before the
+  // next spin could add it again.
+  _wireSmallWinPulseAudio(el) {
+    if (!el) return;
+    playSmallWinBlink();
+    let firedCount = 1;
+    const onIteration = () => {
+      playSmallWinBlink();
+      firedCount += 1;
+      if (firedCount >= 3) el.removeEventListener("animationiteration", onIteration);
+    };
+    el.addEventListener("animationiteration", onIteration);
   }
 }

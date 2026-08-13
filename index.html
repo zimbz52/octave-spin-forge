@@ -34,11 +34,44 @@
 
         <div class="cabinet__kickplate">
           <div class="kickplate__row">
-            <label class="fast-toggle" data-sfx-hover>
-              <input type="checkbox" id="fast-spin-toggle" data-sfx-click />
-              <span class="fast-toggle__track"><span class="fast-toggle__thumb"></span></span>
-              <span class="fast-toggle__label">Fast</span>
-            </label>
+            <div class="kickplate__fast-col">
+              <label class="fast-toggle" data-sfx-hover>
+                <input type="checkbox" id="fast-spin-toggle" data-sfx-click />
+                <span class="fast-toggle__track"><span class="fast-toggle__thumb"></span></span>
+                <span class="fast-toggle__label">Fast</span>
+              </label>
+
+              <!-- Bet-size stepper: minimal, no HTML <button> chrome — just two inline
+                   SVG carets flanking the value. Locked (grayed + pointer-events:none)
+                   for the exact duration of a spin; see main.js's spinBtn handler.
+                   No data-sfx-click: each arrow fires its own pitch-bending uiBet cue
+                   (main.js -> audioHooks.playBetClick()), not the generic uiClick. -->
+              <div class="bet-selector" id="bet-selector" title="Bet Size">
+                <button
+                  type="button"
+                  class="bet-selector__arrow bet-selector__arrow--down"
+                  id="bet-decrease-btn"
+                  aria-label="Decrease bet"
+                  data-sfx-hover
+                >
+                  <svg viewBox="0 0 12 8" width="10" height="7" aria-hidden="true">
+                    <path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+                <span class="bet-selector__value" id="bet-selector-value">$ 1.00</span>
+                <button
+                  type="button"
+                  class="bet-selector__arrow bet-selector__arrow--up"
+                  id="bet-increase-btn"
+                  aria-label="Increase bet"
+                  data-sfx-hover
+                >
+                  <svg viewBox="0 0 12 8" width="10" height="7" aria-hidden="true">
+                    <path d="M1 7l5-5 5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
 
             <button id="spin-btn" class="spin-btn" type="button" data-sfx-hover data-sfx-click>
               <span class="spin-btn__label">SPIN</span>

@@ -177,6 +177,21 @@ export class ReelController {
       });
   }
 
+  // Pauses whatever's currently animating the strip — the WAAPI spin-up ramp, the
+  // CSS cruise-loop, or a landing bounce — without resetting position, so
+  // resumeSpinAnimation() picks up exactly where it left off. getAnimations() covers
+  // all three uniformly (WAAPI-created and CSS @keyframes-driven animations alike),
+  // so there's no need to track which one is currently active. Used only by
+  // backgroundGuard.js's document visibilitychange handler; nothing else needs to
+  // interrupt a spin mid-flight.
+  pauseSpinAnimation() {
+    this.stripEl.getAnimations().forEach((anim) => anim.pause());
+  }
+
+  resumeSpinAnimation() {
+    this.stripEl.getAnimations().forEach((anim) => anim.play());
+  }
+
   // Reads the strip's live on-screen translateY, regardless of whether the ramp
   // (WAAPI) or the cruise loop (CSS animation) is currently driving it.
   getCurrentY() {
