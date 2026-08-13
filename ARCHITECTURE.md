@@ -8,9 +8,10 @@ dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
 Read this file first in any new session on this project. It reflects the state after Step 32
 (the musicMain<->musicIntense crossfade duration from Step 30 is now a live, per-theme Dev Mixer
-setting — a new "Crossfade" slider/row (0-5s, default 1s) stored as `crossfadeMs` alongside each
-theme's bus multipliers in `DevMixer.js`, so it rides along with Export Config the same way bus
-gains do. `ThemeAudio._crossfadeToIntensity()` reads it fresh at the start of each transition. See
+setting — a new "Music Crossfade" slider/row (0-5s in 0.5s steps, default 1s) stored as
+`crossfadeMs` alongside each theme's bus multipliers in `DevMixer.js`, so it rides along with
+Export Config the same way bus gains do. `ThemeAudio._crossfadeToIntensity()` reads it fresh at
+the start of each transition. See
 "Customizable crossfade duration (Step 32)" below).
 Before that: Step 31
 (Arcade's bank was refreshed from the sync drive's `arcadeSounds_v01` — the first bank to actually
@@ -2209,9 +2210,9 @@ start of each crossfade, so a mixer change only affects the *next* transition, n
 already in flight — same "read once per fade, never fought mid-animation" principle Step 30
 already established for the fader/bus multiplier itself.
 
-**UI:** a new "Crossfade" row in the Dev Mixer panel (`index.html`, `DevMixerPanel.js`), styled
-identically to a bus row but rendered as its own fixed row above the BUS_NAMES-driven list rather
-than generated from it, since it isn't a bus. Range 0-5s, step 0.1s. Unlike a bus row, there's
+**UI:** a new "Music Crossfade" row in the Dev Mixer panel (`index.html`, `DevMixerPanel.js`),
+styled identically to a bus row but rendered as its own fixed row above the BUS_NAMES-driven list
+rather than generated from it, since it isn't a bus. Range 0-5s, step 0.5s. Unlike a bus row, there's
 nothing continuously playing to live-refresh mid-drag — the value simply takes effect on whichever
 crossfade triggers next, so the input handler just stores it and updates the label.
 
