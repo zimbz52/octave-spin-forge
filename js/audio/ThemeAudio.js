@@ -43,9 +43,6 @@ const MUSIC_FADE_IN_MS = 2000;
 // spins/animations rather than pausing for them.
 const SMALL_WIN_INTENSITY_COOLDOWN_MS = 10000;
 
-// How long the musicMain <-> musicIntense crossfade itself takes, each direction.
-const MUSIC_CROSSFADE_MS = 1000;
-
 // Overall music trim, independent of the player-facing fader (which stays a full
 // 0-100% range) — knocks every actual musicMain gain down 10% on top of whatever the
 // fader is set to, rather than changing what the fader itself reports/controls.
@@ -73,8 +70,8 @@ class ThemeAudio {
     // Themes with no musicIntense sprite simply never leave 0 — see notifySmallWin().
     this.musicIntensityWeight = 0;
     this._smallWinCooldownTimer = null;
-    // True for the MUSIC_CROSSFADE_MS window a crossfade is actively animating, so
-    // refreshMusicVolume() (fader/mixer changes) doesn't fight Howler's own fade
+    // True for the duration of an in-flight crossfade (see DevMixer.getCrossfadeMs())
+    // so refreshMusicVolume() (fader/mixer changes) doesn't fight Howler's own fade
     // animation mid-flight — it re-applies once the crossfade settles instead.
     this._musicCrossfadeActive = false;
     this._crossfadeSettleTimer = null;
@@ -356,27 +353,31 @@ class ThemeAudio {
   }
 
   // Crossfades musicMain and musicIntense to the given intensity weight (1 = intense
-  // fully up, 0 = back to musicMain) over MUSIC_CROSSFADE_MS, using Howler's own
-  // fade() on each layer's actual current volume — not an assumed starting point, so
-  // a crossfade triggered mid-fade (rapid small wins) still animates smoothly from
-  // wherever the layers actually are rather than jumping.
+  // fully up, 0 = back to musicMain) over the active theme's dev-mixer crossfade
+  // duration (see DevMixer.getCrossfadeMs(), customizable live from the Dev Mixer
+  // panel, defaults to 1000ms), using Howler's own fade() on each layer's actual
+  // current volume — not an assumed starting point, so a crossfade triggered mid-fade
+  // (rapid small wins) still animates smoothly from wherever the layers actually are
+  // rather than jumping. The duration is read fresh at the start of each crossfade, so
+  // a mixer change only affects the *next* crossfade, never distorts one in flight.
   _crossfadeToIntensity(weight) {
     if (!this.howl || this.musicId === null || this.musicIntenseId === null) return;
     this.musicIntensityWeight = weight;
     const multiplier = this._musicTargetVolume();
     const mainTarget = (1 - weight) * multiplier;
     const intenseTarget = weight * multiplier;
+    const crossfadeMs = devMixer.getCrossfadeMs(this.currentTheme);
 
     this._musicCrossfadeActive = true;
-    this.howl.fade(this.howl.volume(this.musicId), mainTarget, MUSIC_CROSSFADE_MS, this.musicId);
-    this.howl.fade(this.howl.volume(this.musicIntenseId), intenseTarget, MUSIC_CROSSFADE_MS, this.musicIntenseId);
+    this.howl.fade(this.howl.volume(this.musicId), mainTarget, crossfadeMs, this.musicId);
+    this.howl.fade(this.howl.volume(this.musicIntenseId), intenseTarget, crossfadeMs, this.musicIntenseId);
 
     clearTimeout(this._crossfadeSettleTimer);
     this._crossfadeSettleTimer = setTimeout(() => {
       this._musicCrossfadeActive = false;
       // Picks up any fader/busMusic mixer change that happened during the crossfade.
       this.refreshMusicVolume();
-    }, MUSIC_CROSSFADE_MS);
+    }, crossfadeMs);
   }
 
   // --- Win mechanics ---

@@ -6,7 +6,13 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 31
+Read this file first in any new session on this project. It reflects the state after Step 32
+(the musicMain<->musicIntense crossfade duration from Step 30 is now a live, per-theme Dev Mixer
+setting — a new "Crossfade" slider/row (0-5s, default 1s) stored as `crossfadeMs` alongside each
+theme's bus multipliers in `DevMixer.js`, so it rides along with Export Config the same way bus
+gains do. `ThemeAudio._crossfadeToIntensity()` reads it fresh at the start of each transition. See
+"Customizable crossfade duration (Step 32)" below).
+Before that: Step 31
 (Arcade's bank was refreshed from the sync drive's `arcadeSounds_v01` — the first bank to actually
 define `musicIntense`, used to verify Step 30 end-to-end with real audio rather than a mocked
 layer; one casing regression, `powerbetOn`/`powerbetOff`, was fixed to `powerBetOn`/`powerBetOff`
@@ -2119,8 +2125,9 @@ resting target is 0.
 i.e. once per small win, the same "winSmalls" event that already fires the small-win layer and
 per-symbol layers. No-ops immediately if the active theme never started a `musicIntense` layer
 (`this.musicIntenseId === null`). Otherwise:
-- If not already fully crossfaded to intense (`musicIntensityWeight < 1`), starts a 1s crossfade
-  toward it (`_crossfadeToIntensity(1)`).
+- If not already fully crossfaded to intense (`musicIntensityWeight < 1`), starts a crossfade
+  toward it (`_crossfadeToIntensity(1)`) — duration is customizable per theme via the Dev Mixer,
+  defaulting to 1s (see "Customizable crossfade duration (Step 32)" below).
 - (Re)arms a strict 10s cooldown (`SMALL_WIN_INTENSITY_COOLDOWN_MS`, wall-clock `setTimeout`, not
   paused for reel spins or any other animation) that crossfades back down to `musicMain`
   (`_crossfadeToIntensity(0)`) if it ever elapses without a new small win. Each new small win
@@ -2135,8 +2142,9 @@ just `musicMain`) is read once at the moment the crossfade starts; each layer is
 from its own *current* actual volume (not an assumed starting point, so a crossfade triggered
 mid-fade — a rapid run of small wins — animates smoothly from wherever it actually is rather than
 jumping) to `weight * multiplier` / `(1 - weight) * multiplier` respectively, over
-`MUSIC_CROSSFADE_MS` (1s). A `_musicCrossfadeActive` flag is set for that window and a settle
-timer calls `refreshMusicVolume()` again the instant it clears — see below for why.
+`devMixer.getCrossfadeMs(currentTheme)` (see Step 32 — defaults to 1000ms). A
+`_musicCrossfadeActive` flag is set for that window and a settle timer calls
+`refreshMusicVolume()` again the instant it clears — see below for why.
 
 **Mixer/fader integration — "for free".** `busRouting.js`'s `busMusic` rule now matches
 `musicIntense` as well as `musicMain`, so both layers share the exact same Dev-Mixer slider and
@@ -2148,7 +2156,7 @@ track sitting at "100% intense" scales exactly like `musicMain` used to when the
 one deliberate wrinkle: `refreshMusicVolume()` skips re-applying while `_musicCrossfadeActive` is
 true, so it doesn't fight Howler's own fade animation mid-flight (re-applying `.volume()` every
 tick would visibly stutter the crossfade); the crossfade's own settle timer calls it once more the
-moment the 1s window ends, so a mixer/fader change made *during* an active crossfade still lands
+moment its window ends, so a mixer/fader change made *during* an active crossfade still lands
 correctly, just after that crossfade finishes rather than instantaneously.
 
 **Not touched:** `_duckMusic()`/`_unduckMusic()` (the Big Win riser duck) still only operate on
@@ -2186,6 +2194,32 @@ small win crossfades to `musicIntense` over 1s, settling exactly at the expected
 (`weight=1`, `musicMain` volume 0, `musicIntense` volume = the full fader/trim/busMusic
 multiplier); left alone for the full 10s cooldown, it crossfades back down to `musicMain` just as
 cleanly (`weight=0`, back to the original split). Zero console errors throughout.
+
+## Customizable crossfade duration (Step 32)
+
+The musicMain<->musicIntense crossfade duration (Step 30) is now a per-theme Dev Mixer setting
+rather than the hardcoded `MUSIC_CROSSFADE_MS` constant it started as. `DevMixer.getCrossfadeMs
+(theme)`/`setCrossfadeMs(theme, ms)` store it as `crossfadeMs` inside the same per-theme object
+as the bus multipliers (`themeMixes[theme].crossfadeMs`) — not itself a bus (see `busRouting.js`),
+just co-located so it rides along automatically with `exportJSON()`/Export Config, the same
+bake-into-`DEFAULT_THEME_MIXES` workflow the bus gains already use. Defaults to 1000ms
+(`DEFAULT_CROSSFADE_MS`) for any theme that hasn't had it explicitly set. `ThemeAudio.
+_crossfadeToIntensity()` reads it fresh (`devMixer.getCrossfadeMs(this.currentTheme)`) at the
+start of each crossfade, so a mixer change only affects the *next* transition, never distorts one
+already in flight — same "read once per fade, never fought mid-animation" principle Step 30
+already established for the fader/bus multiplier itself.
+
+**UI:** a new "Crossfade" row in the Dev Mixer panel (`index.html`, `DevMixerPanel.js`), styled
+identically to a bus row but rendered as its own fixed row above the BUS_NAMES-driven list rather
+than generated from it, since it isn't a bus. Range 0-5s, step 0.1s. Unlike a bus row, there's
+nothing continuously playing to live-refresh mid-drag — the value simply takes effect on whichever
+crossfade triggers next, so the input handler just stores it and updates the label.
+
+**Verified in the Browser pane** on Arcade (the only bank with a real `musicIntense` layer):
+dragging the slider to 3.0s and triggering a small win via `notifySmallWin()`, measured wall-clock
+via `performance.now()` polling `_musicCrossfadeActive`, took ~3012ms — matching the slider almost
+exactly. Confirmed `crossfadeMs` appears correctly in Export Config's output alongside Arcade's
+bus values. Reset to the 1s default afterward. Zero console errors.
 
 ---
 

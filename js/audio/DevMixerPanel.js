@@ -15,6 +15,8 @@ export class DevMixerPanel {
     this.panelEl = panelEl;
     this.themeLabelEl = panelEl.querySelector("#dev-mixer-theme");
     this.busesEl = panelEl.querySelector("#dev-mixer-buses");
+    this.crossfadeRangeEl = panelEl.querySelector("#dev-mixer-crossfade-range");
+    this.crossfadeValueEl = panelEl.querySelector("#dev-mixer-crossfade-value");
     this.exportBtn = panelEl.querySelector("#dev-mixer-export-btn");
     this.exportStatusEl = panelEl.querySelector("#dev-mixer-export-status");
     this.exportOutputEl = panelEl.querySelector("#dev-mixer-export-output");
@@ -22,6 +24,7 @@ export class DevMixerPanel {
     this._statusTimer = null;
 
     this._buildBusRows();
+    this._wireCrossfadeRow();
     this._wireReveal(revealTriggerEl);
     this.closeBtn.addEventListener("click", () => this.hide());
     this.exportBtn.addEventListener("click", () => this._handleExport());
@@ -45,6 +48,17 @@ export class DevMixerPanel {
         themeAudio.refreshBusLive(bus);
       });
       this.busesEl.appendChild(row);
+    });
+  }
+
+  // Crossfade duration only takes effect on the *next* musicMain<->musicIntense
+  // transition (see ThemeAudio._crossfadeToIntensity()) — unlike a bus row, there's
+  // nothing continuously playing on it to live-refresh mid-drag.
+  _wireCrossfadeRow() {
+    this.crossfadeRangeEl.addEventListener("input", () => {
+      const seconds = Number(this.crossfadeRangeEl.value);
+      this.crossfadeValueEl.textContent = `${seconds.toFixed(1)}s`;
+      devMixer.setCrossfadeMs(themeAudio.currentTheme, seconds * 1000);
     });
   }
 
@@ -83,6 +97,10 @@ export class DevMixerPanel {
       range.value = String(value);
       valueEl.textContent = `${Math.round(value * 100)}%`;
     });
+
+    const crossfadeSeconds = (theme ? devMixer.getCrossfadeMs(theme) : 1000) / 1000;
+    this.crossfadeRangeEl.value = String(crossfadeSeconds);
+    this.crossfadeValueEl.textContent = `${crossfadeSeconds.toFixed(1)}s`;
   }
 
   show() {

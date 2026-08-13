@@ -5,6 +5,10 @@ import { BUS_NAMES } from "./busRouting.js";
 // mixer & bus routing (Step 16)" in ARCHITECTURE.md) — not a one-time migration, still
 // fully editable live from this baseline via the mixer UI, and still exportable again
 // to produce an updated version of this same object.
+// ThemeAudio's default when a theme has no explicit crossfadeMs entry below — see
+// getCrossfadeMs(). Matches the vertical-layering system's original hardcoded value.
+const DEFAULT_CROSSFADE_MS = 1000;
+
 const DEFAULT_THEME_MIXES = {
   egypt: {
     busMusic: 0.8,
@@ -62,6 +66,24 @@ class DevMixer {
     if (!theme) return;
     if (!this.themeMixes[theme]) this.themeMixes[theme] = {};
     this.themeMixes[theme][bus] = Math.min(1, Math.max(0, value));
+  }
+
+  // How long ThemeAudio's musicMain <-> musicIntense crossfade takes for this theme
+  // (see notifySmallWin()/_crossfadeToIntensity()), in milliseconds. Stored alongside
+  // the bus multipliers in the same per-theme object (and so travels with them through
+  // exportJSON()) even though it isn't itself a bus — DevMixerPanel renders it as its
+  // own dedicated row, not one of the BUS_NAMES-driven bus rows.
+  getCrossfadeMs(theme) {
+    return this.themeMixes[theme]?.crossfadeMs ?? DEFAULT_CROSSFADE_MS;
+  }
+
+  // Clamped 0-5000ms — an effectively arbitrary but generous ceiling; nothing about
+  // Howler or the crossfade math requires it, it's just implausible to want a single
+  // musicMain<->musicIntense transition longer than 5s.
+  setCrossfadeMs(theme, ms) {
+    if (!theme) return;
+    if (!this.themeMixes[theme]) this.themeMixes[theme] = {};
+    this.themeMixes[theme].crossfadeMs = Math.min(5000, Math.max(0, ms));
   }
 
   // Every bus for a theme, defaults filled in — what the mixer panel renders sliders

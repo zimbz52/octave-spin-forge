@@ -928,6 +928,11 @@ body {
   color: var(--text-light);
 }
 
+.dev-mixer__crossfade-row {
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid rgba(110, 230, 200, 0.15);
+}
+
 .dev-mixer__buses {
   display: flex;
   flex-direction: column;

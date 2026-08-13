@@ -211,6 +211,25 @@
       <span class="dev-mixer__title">DEV MIXER — <span id="dev-mixer-theme">—</span></span>
       <button id="dev-mixer-close-btn" class="dev-mixer__close" type="button" aria-label="Close dev mixer">&times;</button>
     </div>
+    <!-- Not a bus (see busRouting.js) — how long ThemeAudio's musicMain <-> musicIntense
+         crossfade takes for the active theme (DevMixer.getCrossfadeMs()), so it's a
+         standalone row rather than one of the BUS_NAMES-driven rows below. -->
+    <div class="dev-mixer__crossfade-row">
+      <div class="dev-mixer__bus-row">
+        <span class="dev-mixer__bus-label">Crossfade</span>
+        <input
+          type="range"
+          class="dev-mixer__bus-range"
+          id="dev-mixer-crossfade-range"
+          min="0"
+          max="5"
+          step="0.1"
+          value="1"
+          aria-label="Music crossfade duration in seconds"
+        />
+        <span class="dev-mixer__bus-value" id="dev-mixer-crossfade-value">1.0s</span>
+      </div>
+    </div>
     <div class="dev-mixer__buses" id="dev-mixer-buses"></div>
     <div class="dev-mixer__export-row">
       <button id="dev-mixer-export-btn" class="dev-mixer__export-btn" type="button">Export Config</button>
