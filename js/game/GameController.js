@@ -32,6 +32,12 @@ const FAST_TIMING = { spinMs: 150, staggerMs: 0, landingMs: 350 };
 const SMALL_ROLLUP_MS = 1500;
 const BIG_ROLLUP_MS = 17000;
 
+// Must match .symbol--win's own animation-duration (symbol-win-pulse, 0.9s, see
+// styles.css) — its peak brightness sits at each iteration's 50% keyframe, not the
+// iteration boundary, so audio timed to the boundary itself reads as early/off-beat.
+const SMALL_WIN_PULSE_ITERATION_MS = 900;
+const SMALL_WIN_PULSE_PEAK_OFFSET_MS = SMALL_WIN_PULSE_ITERATION_MS / 2;
+
 export class GameController {
   constructor(reelEls, resultEl, winLineEl, celebrationOverlayEl, winCounterEl, winCounterValueEl, bigWinEls) {
     this.reels = reelEls.map((el, i) => new ReelController(el, i));
@@ -214,16 +220,20 @@ export class GameController {
   // fixed delay. Every winning tile gets the class in the same synchronous tick
   // (highlightPayline(), above), so they animate in perfect lockstep — listening on
   // just one reference element drives all 3 pulses without re-triggering per tile.
-  // animationiteration fires between iterations only (twice, for 3 total), so pulse 1
-  // fires immediately here and the other two ride that event; the listener detaches
-  // itself once it's fired its share, since the win class is cleared well before the
-  // next spin could add it again.
+  // animationiteration fires between iterations only (twice, for 3 total), giving a
+  // reliable per-iteration anchor at 0/900/1800ms — but that's each iteration's
+  // *start* (the animation's darkest resting point), not its bright flash, which sits
+  // at the 50% keyframe. Each cue is offset by SMALL_WIN_PULSE_PEAK_OFFSET_MS off that
+  // anchor so it lands on the actual flash instead of firing early. The listener
+  // detaches itself once it's fired its share, since the win class is cleared well
+  // before the next spin could add it again.
   _wireSmallWinPulseAudio(el) {
     if (!el) return;
-    playSmallWinBlink();
+    const fireOnPeak = () => setTimeout(playSmallWinBlink, SMALL_WIN_PULSE_PEAK_OFFSET_MS);
+    fireOnPeak();
     let firedCount = 1;
     const onIteration = () => {
-      playSmallWinBlink();
+      fireOnPeak();
       firedCount += 1;
       if (firedCount >= 3) el.removeEventListener("animationiteration", onIteration);
     };

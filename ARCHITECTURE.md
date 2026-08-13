@@ -10,8 +10,11 @@ Read this file first in any new session on this project. It reflects the state a
 (three independent audio-timing fixes: `uiTransition` now fires the instant a theme is selected —
 init-menu terminal or in-game dropdown — instead of once the reveal finishes;
 `playSmallWinBlink()` ("uiPulse") now fires 3 times per small win, synced to the actual
-3-iteration `.symbol--win` CSS animation via its native `animationiteration` event rather than a
-single guessed-timing call; and `moneyCounter`'s pitch randomization was removed entirely —
+3-iteration `.symbol--win` CSS animation's peak-brightness instants (its `animationiteration`
+event as the per-iteration anchor, offset by half an iteration to land on the 50% keyframe rather
+than the darkest iteration boundary — a same-session correction after the first version's
+boundary-timed cues read as unsynced); and `moneyCounter`'s pitch randomization was removed
+entirely —
 `moneyCounterEnd` now calls `howl.play()` directly instead of routing through `SystemAudio.play()`'s
 randomized-rate wrapper, matching the loop itself, which never randomized to begin with. See
 "Theme-select audio timing, synced small-win pulses, and an in-tune money counter (Step 40)"
@@ -2888,16 +2891,28 @@ Three independent, user-directed audio-timing fixes, none of them touching the u
   in-game dropdown.
 - **`uiPulse` now fires 3 times per small win, synced to the actual 3-iteration `.symbol--win` CSS
   animation** (`symbol-win-pulse`, 0.9s × 3, see styles.css) instead of firing once, well after the
-  celebration pop had already finished. `GameController._wireSmallWinPulseAudio()` fires the first
-  `playSmallWinBlink()` immediately when `highlightPayline()` applies the win class (matching the
-  animation's own start), then listens for the CSS animation's native `animationiteration` event on
-  one reference payline element to fire the other two — that event fires between iterations only
-  (twice, for 3 total), so no fixed-delay guessing is involved, and it self-corrects if anything
-  upstream ever changes the animation's duration or iteration count. Only one element is wired
-  (not all 3 winning tiles) because every winning tile gets the class in the same synchronous tick
-  and animates in lockstep — wiring all of them would have tripled the pulses instead of syncing
-  them. Verified live: a real small win logged exactly 3 `playSmallWinBlink()` calls, the first
-  ahead of `playWinLineDash()`, the other two interleaved with the win roll-up.
+  celebration pop had already finished. `GameController._wireSmallWinPulseAudio()` listens for the
+  CSS animation's native `animationiteration` event on one reference payline element — it fires
+  between iterations only (twice, for 3 total, at the 0/900/1800ms boundaries) — as a reliable
+  per-iteration anchor. Only one element is wired (not all 3 winning tiles) because every winning
+  tile gets the class in the same synchronous tick and animates in lockstep — wiring all of them
+  would have tripled the pulses instead of syncing them.
+  **Correction, same-session, reported by the user as "still not synced":** the first version fired
+  audio right on each iteration boundary — but the animation's own keyframes put peak brightness at
+  each iteration's *50% mark*, not its boundary (the boundary is the animation's darkest resting
+  point, 0% and 100% of the keyframe). Firing on the boundary meant every cue landed a consistent
+  450ms *before* the visual flash it was meant to accent — small enough to not be an obvious "wrong
+  count" bug, large enough to read as unmusical. Fixed by offsetting every cue by a new
+  `SMALL_WIN_PULSE_PEAK_OFFSET_MS` (900ms iteration / 2, hardcoded to match the CSS rather than
+  read live off the animation, same style as this file's other fixed timing constants) before
+  calling `playSmallWinBlink()`. Verified with a `MutationObserver` (timestamping the instant
+  `.symbol--win` is actually applied) cross-referenced against a `Howl.play` spy (timestamping each
+  `uiPulse` play call): the 3 cues landed at +461ms / +1351ms / +2251ms off the win-class instant,
+  matching the keyframe's 450/1350/2250ms peaks within ordinary timer jitter. **If this class of
+  "technically firing 3x but still feels off" bug resurfaces elsewhere** (any audio cue tied to a
+  CSS/WAAPI animation), check the keyframe's own peak offset before assuming the trigger count or
+  timing source is the problem — matching iteration *count* isn't the same as matching iteration
+  *phase*.
 - **`moneyCounter`'s pitch randomization removed entirely.** The looping counter itself
   (`moneyCounter01/02`) never had pitch randomization to begin with (`SystemAudio.playSmallWinDigits()`
   already called `this.howl.play()` directly, bypassing the `play()` wrapper's
