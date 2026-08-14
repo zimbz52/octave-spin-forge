@@ -34,44 +34,27 @@
 
         <div class="cabinet__kickplate">
           <div class="kickplate__row">
-            <div class="kickplate__fast-col">
-              <label class="fast-toggle" data-sfx-hover>
-                <input type="checkbox" id="fast-spin-toggle" data-sfx-click />
-                <span class="fast-toggle__track"><span class="fast-toggle__thumb"></span></span>
-                <span class="fast-toggle__label">Fast</span>
-              </label>
-
-              <!-- Bet-size stepper: minimal, no HTML <button> chrome — just two inline
-                   SVG carets flanking the value. Locked (grayed + pointer-events:none)
-                   for the exact duration of a spin; see main.js's spinBtn handler.
-                   No data-sfx-click: each arrow fires its own pitch-bending uiBet cue
-                   (main.js -> audioHooks.playBetClick()), not the generic uiClick. -->
-              <div class="bet-selector" id="bet-selector" title="Bet Size">
-                <button
-                  type="button"
-                  class="bet-selector__arrow bet-selector__arrow--down"
-                  id="bet-decrease-btn"
-                  aria-label="Decrease bet"
-                  data-sfx-hover
-                >
-                  <svg viewBox="0 0 12 8" width="10" height="7" aria-hidden="true">
-                    <path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </button>
-                <span class="bet-selector__value" id="bet-selector-value">$ 1.00</span>
-                <button
-                  type="button"
-                  class="bet-selector__arrow bet-selector__arrow--up"
-                  id="bet-increase-btn"
-                  aria-label="Increase bet"
-                  data-sfx-hover
-                >
-                  <svg viewBox="0 0 12 8" width="10" height="7" aria-hidden="true">
-                    <path d="M1 7l5-5 5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+            <!-- Same 74px brushed-metal button shape/position as Super Bet on Spin's other
+                 side (see styles.css's .fast-toggle comment) — a track-and-thumb SVG glyph
+                 keeps it reading as a switch rather than a second command button. -->
+            <button
+              id="fast-toggle-btn"
+              class="fast-toggle"
+              type="button"
+              data-sfx-hover
+              data-sfx-click
+              aria-pressed="false"
+              aria-label="Fast spin"
+              title="Fast — skip the reel stagger and landing bounce"
+            >
+              <span class="fast-toggle__icon" aria-hidden="true">
+                <svg viewBox="0 0 20 12" width="18" height="11">
+                  <rect x="1" y="1" width="18" height="10" rx="5" fill="none" stroke="currentColor" stroke-width="1.6" />
+                  <circle class="fast-toggle__thumb-dot" cx="6" cy="6" r="3.4" fill="currentColor" />
+                </svg>
+              </span>
+              <span class="fast-toggle__label">Fast Spin</span>
+            </button>
 
             <button id="spin-btn" class="spin-btn" type="button" data-sfx-hover data-sfx-click>
               <span class="spin-btn__label">SPIN</span>
@@ -94,6 +77,40 @@
             >
               <span class="powerbet-toggle__icon" aria-hidden="true">&#9889;</span>
               <span class="powerbet-toggle__label">Super Bet</span>
+            </button>
+          </div>
+
+          <!-- Bet-size stepper: centered directly below Spin (its own row, not tucked
+               under Fast) — same dark bordered pill as .audio-fader/.audio-dock__theme in
+               the audio dock, so it reads as a deliberate control instead of bare floating
+               text. Solid filled-triangle arrows (not outlined chevrons) to match the
+               cabinet's chunkier icon language. Locked (grayed + pointer-events:none) for
+               the exact duration of a spin; see main.js's spinBtn handler. No
+               data-sfx-click: each arrow fires its own pitch-bending uiBet cue
+               (main.js -> audioHooks.playBetClick()), not the generic uiClick. -->
+          <div class="bet-selector" id="bet-selector" title="Bet Size">
+            <button
+              type="button"
+              class="bet-selector__arrow bet-selector__arrow--down"
+              id="bet-decrease-btn"
+              aria-label="Decrease bet"
+              data-sfx-hover
+            >
+              <svg viewBox="0 0 12 8" width="10" height="7" aria-hidden="true">
+                <path d="M0 0h12L6 8z" fill="currentColor" />
+              </svg>
+            </button>
+            <span class="bet-selector__value" id="bet-selector-value">$ 1.00</span>
+            <button
+              type="button"
+              class="bet-selector__arrow bet-selector__arrow--up"
+              id="bet-increase-btn"
+              aria-label="Increase bet"
+              data-sfx-hover
+            >
+              <svg viewBox="0 0 12 8" width="10" height="7" aria-hidden="true">
+                <path d="M0 8h12L6 0z" fill="currentColor" />
+              </svg>
             </button>
           </div>
         </div>

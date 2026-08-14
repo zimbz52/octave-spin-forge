@@ -16,7 +16,7 @@ const PITCH_RATE_MAX = 1.06;
 // exactly 1.0, so an isolated click always sounds neutral. Deliberately not
 // randomized like play()'s other sprites — this rate is a controlled, directional
 // effect tied to click speed, not jitter.
-const BET_CLICK_CONSECUTIVE_MS = 500;
+const BET_CLICK_CONSECUTIVE_MS = 1000;
 const BET_CLICK_RATE_STEP = 0.05;
 const BET_CLICK_RATE_MAX = 1.5;
 const BET_CLICK_RATE_MIN = 0.5;
@@ -103,19 +103,35 @@ class SystemAudio {
     return matches[Math.floor(Math.random() * matches.length)];
   }
 
+  // Picks a random money-counter variant — "counterMain" plus its named (not
+  // numbered) siblings from the systemSounds v2 refresh: counterBubbles/Digital/
+  // Wood/Zap (renamed from the moneyCounter* prefix, same-session, for a shorter/
+  // clearer sprite-name family). Not _randomAvailableIndexedName() above — these
+  // don't share a numbered suffix, they're distinct named takes, so this matches on
+  // the shared "counter" prefix directly and explicitly excludes counterEnd, which is
+  // always the fixed completion sting (stopSmallWinDigits() below), never part of the
+  // randomized loop pool.
+  _randomMoneyCounterName() {
+    const matches = [...this._spriteNames].filter(
+      (name) => name.startsWith("counter") && name !== "counterEnd"
+    );
+    if (matches.length === 0) return null;
+    return matches[Math.floor(Math.random() * matches.length)];
+  }
+
   // --- Small win money counter (systemic fallback) ---
   // Only ever used when the active theme doesn't define its own winSmallDigits/
   // winSmallDigitsEnd pair — audioHooks.js decides which bank to use (see
-  // startWinRollup()/stopWinRollup()), not this class. moneyCounter01/02 (randomly
-  // picked, for variety across plays) + moneyCounterEnd, per the systemSounds v1
-  // refresh — both the loop and the end sting deliberately call this.howl.play()
-  // directly rather than the play() wrapper above, so neither gets play()'s
-  // randomized pitch: the counter should read as one consistent, in-tune cue across
-  // every play, matching the theme-bank version's behavior (ThemeAudio._play() never
-  // randomizes pitch either).
+  // startWinRollup()/stopWinRollup()), not this class. A random counter* variant
+  // (for variety across plays) + counterEnd, per the systemSounds v2 refresh — both
+  // the loop and the end sting deliberately call this.howl.play() directly rather
+  // than the play() wrapper above, so neither gets play()'s randomized pitch: the
+  // counter should read as one consistent, in-tune cue across every play, matching
+  // the theme-bank version's behavior (ThemeAudio._play() never randomizes pitch
+  // either).
   playSmallWinDigits() {
     if (!this.ready || !this.howl) return;
-    const name = this._randomAvailableIndexedName("moneyCounter");
+    const name = this._randomMoneyCounterName();
     if (!name) return;
     this.smallWinDigitsId = this.howl.play(name);
     this.howl.loop(true, this.smallWinDigitsId);
@@ -125,7 +141,7 @@ class SystemAudio {
     if (!this.howl || this.smallWinDigitsId === null) return;
     const id = this.smallWinDigitsId;
     this.smallWinDigitsId = null;
-    this.howl.once("stop", () => this.howl.play("moneyCounterEnd"), id);
+    this.howl.once("stop", () => this.howl.play("counterEnd"), id);
     this.howl.stop(id);
   }
 

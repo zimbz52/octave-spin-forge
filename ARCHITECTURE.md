@@ -6,7 +6,21 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 40
+Read this file first in any new session on this project. It reflects the state after Step 41
+(kickplate control rework, done without pushing per the user's request — still local-only: the
+bet-selector is now a proper dark bordered pill, matching every other readout's monospace font,
+centered on its own row directly below Spin with equal literal clearance from Spin's border above
+and the frame's edge below; the Fast-spin toggle is rebuilt as a `<button>` matching
+`.powerbet-toggle`'s exact 74×48px shape/position (a track-and-thumb SVG glyph keeps it reading as
+a switch), labeled "Fast Spin"; `systemSounds` refreshed to v2 — the money-counter loop now
+randomizes across 5 named variants, renamed same-session to a `counter*` family
+(`counterMain`/`Bubbles`/`Digital`/`Wood`/`Zap`, no longer `moneyCounter*`/a numbered `01/02`
+pair) via a new `SystemAudio._randomMoneyCounterName()`, always still capped off by the fixed
+`counterEnd` sting; and the Signal Monitor's always-blank tag column (SYS/THEME) was removed,
+reclaiming 22px for the sprite-name column so full names (suffix included) render without an
+`ellipsis` cutting them off. See "Kickplate control rework: bet-selector pill, a matched Fast-spin
+button, and systemSounds v2 (Step 41)" below).
+Before that: Step 40
 (three independent audio-timing fixes: `uiTransition` now fires the instant a theme is selected —
 init-menu terminal or in-game dropdown — instead of once the reveal finishes;
 `playSmallWinBlink()` ("uiPulse") now fires 3 times per small win, synced to the actual
@@ -2923,6 +2937,100 @@ Three independent, user-directed audio-timing fixes, none of them touching the u
   `moneyCounter02` or `moneyCounterEnd`'s sound ids, while `uiDash`/`uiPulse`/`winSmall01`/etc. in
   the same win still received their usual randomized rate — confirms the change is scoped to just
   the money-counter family, not a global regression of `SystemAudio.play()`'s pitch jitter.
+
+---
+
+## Kickplate control rework: bet-selector pill, a matched Fast-spin button, and systemSounds v2 (Step 41)
+
+A cluster of visual/UX fixes to the kickplate controls, plus one audio-bank refresh, all done
+without pushing per the user's request (still local-only as of this writing):
+
+- **Bet-selector reworked into a proper pill.** The original `.bet-selector` was bare floating
+  text + unstyled SVG chevrons — no `font-family` on the value at all (inheriting the browser
+  default sans, mismatching every other readout in the cabinet) and thin dim-gray arrows with no
+  relation to the cabinet's iconography. Reworked to reuse the same dark bordered pill treatment
+  as `.audio-fader`/`.audio-dock__theme` (`border-radius: 999px`, `var(--control-border)`/
+  `var(--control-bg)`), `"Courier New", monospace` on the value, and solid filled-triangle SVG
+  arrows instead of outlined chevrons.
+- **Repositioned to its own row, centered below Spin** (was stacked under the Fast toggle, in the
+  kickplate's left 74px column) — `.cabinet__kickplate` is now a column flex (row, then the pill)
+  instead of the row being the only child. First pass measured the gap from Spin's *shadow-
+  inclusive* visual edge (matching the reasoning `.cabinet__frame`'s own bottom-padding comment
+  already used for Spin itself) and came out asymmetric-but-intentional (40px raw above / 14px
+  raw below, meant to read as equal). The user's next request clarified they wanted literal,
+  equal raw distance from Spin's actual border, not its shadow — reworked to a plain matching
+  value both sides (currently 24px `.cabinet__kickplate` gap == 24px `.cabinet__frame` bottom
+  padding), verified via `getBoundingClientRect()` on both gaps.
+- **Sized up per follow-up request**: padding 5px/10px → 7px/14px, value font-size 0.72rem →
+  0.82rem, arrow SVGs 10×7 → 12×9. Verified pill grew from 27×116px to 33×138px, gaps still equal
+  (24px/25px, 1px rounding only) after the resize.
+- **Fast-spin toggle rebuilt as a `<button>` matching `.powerbet-toggle`'s exact shape, size, and
+  position** (mirrored on Spin's other side) — replacing the old checkbox + sliding-track switch,
+  per an explicit user request for symmetry with Super Bet. Keeps reading as a switch (not a
+  second command button) via a small track-and-thumb SVG glyph whose dot slides on state change
+  (`cx` as an animatable CSS geometry property, not a `transform`, to avoid the viewBox's own
+  scale ambiguity). New `--fast-accent` cyan (`#38c6e0`), distinct from `--cabinet-accent` (gold)
+  and `--powerbet-accent` (orange), for the active-state glow — no infinite pulse like Powerbet's
+  armed state, since Fast is a persistent session mode, not a one-shot arm. `main.js`'s
+  `fastToggle` wiring switched from a `change`/`.checked` listener to a `click` + local
+  `fastEnabled` boolean + `aria-pressed`, mirroring `powerbetBtn`'s own pattern exactly. Both
+  buttons' heights (43px vs. 48px, from the icon-size difference — an emoji glyph vs. an SVG
+  glyph don't naturally match) were pinned to an explicit, identical `height: 48px` so the two
+  stay pixel-symmetric regardless of icon rendering. Verified: 74×48px both, 157px from Spin's
+  center on both sides. Label text is "Fast Spin" (was "Fast"), per a same-session follow-up.
+  **Diagnostic note**: mid-testing, a synthetic click on the startup terminal's theme list
+  appeared to do nothing, and the terminal seemed to still be showing on a later screenshot even
+  after the game DOM had loaded — both were testing-script artifacts, not app bugs: (1) the click
+  landed before `WelcomeScreen.dismiss()`'s fade transition had finished attaching
+  `waitForSelection()`'s listener (a script-timing race, not reproducible from a real user's
+  slower manual click), and (2) the stale-looking screenshot was a frozen compositor frame from
+  the Browser-pane tool having been not-visible/not-compositing a moment earlier — re-querying the
+  DOM directly (not the screenshot) showed the terminal genuinely gone. Neither is an app defect.
+- **systemSounds refreshed to v2**: the small-win money counter's numbered `moneyCounter01/02`
+  convention is gone entirely, replaced by named variants — `moneyCounter`, `moneyCounterBubbles`,
+  `moneyCounterDigital`, `moneyCounterWood`, `moneyCounterZap` — none of which end in digits, so
+  the existing `_randomAvailableIndexedName()` (built for a `"<prefix><NN>"` pattern) silently
+  matches nothing against them. Added a dedicated `SystemAudio._randomMoneyCounterName()`
+  instead: filters sprite names starting with `"moneyCounter"` and explicitly excludes
+  `"moneyCounterEnd"`, per the user's explicit instruction to keep End as the fixed completion
+  sting, never part of the randomized pool. Verified live with a `Howl.play` spy across several
+  small wins: random draws from the 5-variant pool (`moneyCounterBubbles`, `moneyCounter` both
+  observed), every one immediately followed by exactly `moneyCounterEnd`, never the reverse and
+  never `moneyCounterEnd` itself drawn as the starter. `uiDash`'s duration also changed (0.385s →
+  0.645s) as an incidental part of the v2 bank; no code depends on that duration directly, so no
+  further change was needed for it.
+- **Signal Monitor: the tag column (SYS/THEME, always rendered blank per its own "reserved for
+  something more useful... not removed from the layout" comment) removed entirely**, per an
+  explicit user request ("remove the old spacing we left there") after noticing long sprite names
+  were losing their identifying suffix to the row's `text-overflow: ellipsis` (e.g.
+  `"moneyCounte…"`, the "Bubbles"/"Digital" part invisible). `AudioProfiler.js`'s row template
+  dropped the `<span class="audio-profiler__row-tag">`, `.audio-profiler__row`'s
+  `grid-template-columns` went from `16px 1fr 32px` to `1fr 32px`, and the now-dead
+  `.audio-profiler__row-tag` CSS rule was deleted. Reclaimed exactly the expected 22px (16px
+  column + 6px gap) — verified via `getBoundingClientRect()` before/after (name column: 80px →
+  102px for a short name). Checked the fix wouldn't reintroduce the overlap the panel's own width
+  comment warns about: at the referenced ~846px test viewport, `.audio-profiler`'s left edge sits
+  essentially flush against `.cabinet__frame`'s right edge already (measured slack: -1px) — so
+  *widening* the panel is not safe headroom, only reclaiming already-dead internal space was.
+- **`moneyCounter*` sprite names renamed to `counter*`** (`counterMain`/`Bubbles`/`Digital`/`End`/
+  `Wood`/`Zap`, "moneyCounter" itself explicitly renamed to `counterMain` rather than the empty
+  string a blind prefix-strip would've produced), per an explicit user request, project's
+  `src/audio/systemSounds.json` copy only — the sync-drive `systemSounds_v02.json` master is
+  untouched, same scoping precedent as the earlier `moneyCounter01` removal. `SystemAudio.js`'s
+  `_randomMoneyCounterName()` and `stopSmallWinDigits()` updated to match (`"counter"` prefix,
+  excludes `"counterEnd"`). This rename also incidentally finished off the Signal Monitor
+  truncation above: the shorter names (`counterBubbles`/`counterDigital`, 14 chars vs. the old
+  `moneyCounterBubbles`/`moneyCounterDigital`'s 20) now fit inside the reclaimed 102px name column
+  without even touching the ellipsis — confirmed live, full names rendering during a real small
+  win (`counterBubbles` then `counterEnd`, both fully visible in the Signal Monitor).
+- **Bet-selector pitch-bend's consecutive-click window raised 500ms → 1000ms**
+  (`SystemAudio.js`'s `BET_CLICK_CONSECUTIVE_MS`), per an explicit user request — clicking an
+  arrow again within 1s of the last click now keeps bending the rate, instead of 500ms. Verified
+  with precisely-timed synthetic clicks (both dispatched from one script, not two separate tool
+  calls — an earlier attempt using two separate `wait`+`click` tool calls measured a "700ms" gap
+  that actually reset, which turned out to be tool round-trip overhead pushing the real gap past
+  1000ms, not a bug): a 700ms gap now bends (`1.0` → `1.05`), an 1100ms gap still resets
+  (`1.0` → `1.0`).
 
 ---
 

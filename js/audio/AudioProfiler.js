@@ -67,10 +67,7 @@ export class AudioProfiler {
       if (!row) {
         const el = document.createElement("div");
         el.className = "audio-profiler__row";
-        // The tag slot (SYS/THEME) is intentionally left blank for now — reserved for
-        // something more useful than the bank name, not removed from the layout.
         el.innerHTML = `
-          <span class="audio-profiler__row-tag"></span>
           <span class="audio-profiler__row-name"></span>
           <span class="audio-profiler__row-meter"><span class="audio-profiler__row-meter-fill"></span></span>
         `;

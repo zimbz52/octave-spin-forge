@@ -19,6 +19,11 @@
      wins/highlights) — Powerbet needs to read as a different, higher-energy mode at a
      glance, not just another gold glow blending into everything else. */
   --powerbet-accent: #ff5c3d;
+  /* Distinct from both --cabinet-accent (gold) and --powerbet-accent (orange/red) —
+     Fast is now the same brushed-metal button shape/size as Powerbet (mirrored on
+     Spin's other side), so it needs its own identity or the two would read as the same
+     control in different states. */
+  --fast-accent: #38c6e0;
   --glass-bg: #05060a;
   --text-light: #f2ead3;
   --text-dim: #9a9488;
@@ -354,13 +359,11 @@ body {
    the app now instead of the cabinet being its own distinct design. */
 .cabinet__frame {
   width: 100%;
-  /* Bottom padding is deliberately larger than the other three sides — the Spin
-     button's own "3D press" box-shadow (0 8px 0 solid + 0 12px 18px blur below the
-     circle) adds ~25-30px of visible weight under it that a uniform 8px padding
-     doesn't account for, so the button reads as sitting flush on the frame's edge.
-     This absorbs that shadow so the clearance below it visually matches the 8px
-     above the reels. */
-  padding: 8px 8px 34px;
+  /* Bottom padding is a literal match for .cabinet__kickplate's row-to-selector gap
+     (below) — both measured from the Spin button's actual yellow edge/border, not the
+     extra visual weight its drop-shadow adds beneath it, so the bet-selector pill sits
+     equidistant from Spin's border above and this frame's edge below. */
+  padding: 8px 8px 24px;
   background: linear-gradient(180deg, var(--panel-bg-1) 0%, var(--panel-bg-2) 100%);
   border-radius: var(--radius-md);
   border: 1px solid var(--panel-border);
@@ -812,7 +815,11 @@ body {
 
 .audio-profiler__row {
   display: grid;
-  grid-template-columns: 16px 1fr 32px;
+  /* Was "16px 1fr 32px" — the leading 16px was the tag (SYS/THEME) column, always
+     rendered blank (see AudioProfiler.js), just reserved dead space pushing the name
+     right and starving it of room to show a sprite name's own suffix before the
+     ellipsis kicked in (e.g. "counterB…" instead of "counterBubbles"). */
+  grid-template-columns: 1fr 32px;
   align-items: center;
   gap: 6px;
   padding: 5px 7px;
@@ -837,12 +844,6 @@ body {
 .audio-profiler__row--muted .audio-profiler__row-name {
   color: var(--text-dim);
   text-decoration: line-through;
-}
-
-.audio-profiler__row-tag {
-  font-size: 0.55rem;
-  letter-spacing: 0.05em;
-  color: var(--text-dim);
 }
 
 .audio-profiler__row-name {
@@ -1482,9 +1483,16 @@ body {
 
 /* ---------- Kickplate / Controls ---------- */
 
+/* Column of 2: the Fast/Spin/Super Bet row, then the bet-size stepper centered
+   directly below it. align-items: center (not stretch) keeps the stepper's own
+   shrink-to-fit pill width from being forced to the row's full width. 24px, a literal
+   match for .cabinet__frame's bottom padding — see that rule's comment for why this is
+   measured from Spin's actual border, not its drop-shadow. */
 .cabinet__kickplate {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
 }
 
 .kickplate__row {
@@ -1496,25 +1504,20 @@ body {
   width: 100%;
 }
 
-/* Stacks the Fast toggle directly above the bet-size stepper, both centered in the
-   kickplate row's first 74px column — keeps them visually grouped as one "spin
-   settings" cluster regardless of how either one's own internal layout changes. */
-.kickplate__fast-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
 /* ---------- Bet-size stepper ---------- */
-/* Deliberately not a bordered/backgrounded control — "sleek, minimal" means the value
-   reads like a label with two small clickable carets, not a boxed widget. Each arrow
-   is a real <button> (keyboard-operable, focusable) but reset to bare — no border,
-   background, or padding — so only the SVG glyph itself is visible. */
+/* Same dark bordered pill as .audio-fader/.audio-dock__theme (below) — reads as one
+   deliberate control, not bare floating text, and gives it enough visual weight to
+   hold its own against the metallic Super Bet button mirrored on Spin's other side.
+   Each arrow is a real <button> (keyboard-operable, focusable) reset to bare within
+   the pill — no border/background of its own, just the filled-triangle SVG glyph. */
 .bet-selector {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
   user-select: none;
 }
 
@@ -1522,13 +1525,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3px;
-  margin: -3px;
+  padding: 4px;
   border: none;
   background: none;
   color: var(--text-dim);
   cursor: pointer;
   transition: color 0.15s ease, opacity 0.15s ease, transform 0.06s ease;
+}
+
+.bet-selector__arrow svg {
+  width: 12px;
+  height: 9px;
 }
 
 .bet-selector__arrow:hover:not(:disabled) {
@@ -1556,8 +1563,9 @@ body {
 }
 
 .bet-selector__value {
-  min-width: 44px;
-  font-size: 0.62rem;
+  min-width: 52px;
+  font-family: "Courier New", monospace;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--text-light);
@@ -1584,6 +1592,10 @@ body {
   justify-content: center;
   gap: 4px;
   width: 74px;
+  /* Explicit height, not just padding — .fast-toggle mirrors this exactly (same
+     value) so the two stay pixel-identical regardless of their icons' own natural
+     rendered size (an emoji glyph vs. an SVG glyph don't reliably match otherwise). */
+  height: 48px;
   padding: 8px 4px;
   border: 1px solid var(--metal-shadow);
   border-radius: 10px;
@@ -1684,87 +1696,120 @@ body {
 }
 
 /* ---------- Fast-spin toggle ---------- */
-
+/* Same 74px brushed-aluminum button shape/size/position as .powerbet-toggle below
+   (mirrored on Spin's other side) — reads as one matched pair of hardware controls
+   instead of two different UI languages sharing a kickplate. Built as a real <button>
+   (not the old checkbox + sliding-track switch), toggled via aria-pressed the same way
+   .powerbet-toggle is (see main.js). A small track-and-thumb SVG glyph stands in for
+   Powerbet's lightning-bolt emoji so it still reads as a switch, not a second command
+   button — the dot literally slides side to side on state change (see
+   .fast-toggle--active .fast-toggle__thumb-dot below). Deliberately no infinite pulse
+   like Powerbet's armed state: Fast is a persistent session mode that might stay on
+   for dozens of spins, not a one-shot armed state — a steady glow reads calmer than an
+   endless animation would over that long a stretch. */
 .fast-toggle {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 4px;
+  width: 74px;
+  /* Matches .powerbet-toggle's own explicit height exactly — see its comment. */
+  height: 48px;
+  padding: 8px 4px;
+  border: 1px solid var(--metal-shadow);
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(
+      95deg,
+      rgba(255, 255, 255, 0.08) 0px,
+      rgba(255, 255, 255, 0.08) 1px,
+      rgba(0, 0, 0, 0.06) 1px,
+      rgba(0, 0, 0, 0.06) 2px
+    ),
+    linear-gradient(165deg, var(--metal-light) 0%, var(--metal-mid) 35%, var(--metal-dark) 70%, var(--metal-shadow) 100%);
+  box-shadow:
+    0 5px 0 var(--metal-shadow),
+    0 9px 14px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.45);
   cursor: pointer;
-  user-select: none;
+  transition: border-color 0.15s ease, box-shadow 0.06s ease, transform 0.06s ease;
 }
 
-.fast-toggle input {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
+.fast-toggle__icon {
+  display: flex;
+  color: #3a3a3d;
 }
 
-/* Recessed metal channel — inset shadow (not a drop shadow) so the track itself reads
-   as a groove cut into the kickplate, distinct from the raised buttons either side of
-   it. The thumb is a small brushed-aluminum puck sliding inside it: same light-to-dark
-   sheen + bevel technique as .spin-btn/.powerbet-toggle, just scaled down. */
-.fast-toggle__track {
-  position: relative;
-  width: 42px;
-  height: 22px;
-  background: linear-gradient(180deg, #17181a 0%, #0b0b0d 100%);
-  border: 1px solid #050506;
-  border-radius: 999px;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.85), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
-  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.fast-toggle__thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: linear-gradient(165deg, var(--metal-hi) 0%, var(--metal-light) 35%, var(--metal-mid) 70%, var(--metal-dark) 100%);
-  box-shadow:
-    0 2px 3px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.35);
-  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.06s ease;
-}
-
-.fast-toggle input:checked + .fast-toggle__track {
-  background: linear-gradient(180deg, #241f0c 0%, #171304 100%);
-  border-color: rgba(212, 175, 55, 0.5);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75), 0 0 8px rgba(212, 175, 55, 0.3);
-}
-
-.fast-toggle input:checked + .fast-toggle__track .fast-toggle__thumb {
-  transform: translateX(20px);
-  background: linear-gradient(165deg, #fdeeb0 0%, #e8c766 35%, var(--cabinet-accent) 70%, #8a6b16 100%);
-}
-
-.fast-toggle:hover .fast-toggle__track {
-  border-color: rgba(212, 175, 55, 0.5);
-}
-
-/* Physical press: the thumb itself compresses toward the channel (shrinks + its own
-   shadow flattens), on top of the existing whole-track scale-down — reads as the puck
-   actually being pressed into its groove, not just the control shrinking uniformly. */
-.fast-toggle input:active + .fast-toggle__track {
-  transform: scale(0.96);
-}
-
-.fast-toggle input:active + .fast-toggle__track .fast-toggle__thumb {
-  box-shadow:
-    0 1px 1px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+/* cx (an animatable CSS geometry property, not just an SVG attribute) is what actually
+   slides the dot — simpler and more reliable across the SVG's own coordinate space
+   than a CSS transform, which would need to account for the viewBox's own scale. */
+.fast-toggle__thumb-dot {
+  cx: 6;
+  transition: cx 0.15s ease;
 }
 
 .fast-toggle__label {
-  font-size: 0.68rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
+  color: #1c1c1e;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
+}
+
+.fast-toggle:hover {
+  border-color: var(--fast-accent);
+}
+
+/* Physically depresses: translateY + the shadow's own offset/blur shrink to match,
+   not just the button moving while a fixed shadow floats underneath it — identical
+   mechanic to .powerbet-toggle:active below. */
+.fast-toggle:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 1px 0 var(--metal-shadow),
+    0 3px 6px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.45);
+}
+
+.fast-toggle:focus-visible {
+  outline: 2px solid var(--fast-accent);
+  outline-offset: 2px;
+}
+
+.fast-toggle:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* On: the metal itself doesn't change (still the same brushed aluminum) — a steady
+   cyan glow layers on top of the existing shadow stack, same principle as Powerbet's
+   pulsing ring but static (see the block comment above for why no animation here). */
+.fast-toggle--active {
+  border-color: var(--fast-accent);
+  box-shadow:
+    0 5px 0 var(--metal-shadow),
+    0 9px 14px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.45),
+    0 0 10px 1px rgba(56, 198, 224, 0.55);
+}
+
+.fast-toggle--active .fast-toggle__icon {
+  color: var(--fast-accent);
+}
+
+.fast-toggle--active .fast-toggle__thumb-dot {
+  cx: 14;
+}
+
+.fast-toggle--active .fast-toggle__label {
+  color: var(--fast-accent);
+  text-shadow: none;
 }
 
 /* Gold-anodized brushed aluminum (Step 14) — the biggest, heaviest application of the
@@ -1826,14 +1871,5 @@ body {
   cursor: default;
   filter: grayscale(0.4) brightness(0.85);
   transform: none;
-}
-
-.fast-toggle input:disabled {
-  cursor: default;
-}
-
-.fast-toggle:has(input:disabled) {
-  opacity: 0.5;
-  cursor: default;
 }
 

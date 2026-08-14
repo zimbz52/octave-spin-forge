@@ -187,7 +187,7 @@ function wireGame() {
   const reelEls = Array.from(document.querySelectorAll(".reel"));
   const resultEl = document.getElementById("result-readout");
   const spinBtn = document.getElementById("spin-btn");
-  const fastToggle = document.getElementById("fast-spin-toggle");
+  const fastToggle = document.getElementById("fast-toggle-btn");
   const powerbetBtn = document.getElementById("powerbet-toggle-btn");
   const cabinetFrameEl = document.querySelector(".cabinet__frame");
   const winLineEl = document.getElementById("win-line");
@@ -218,8 +218,15 @@ function wireGame() {
 
   const betSelector = wireBetSelector();
 
-  fastToggle.addEventListener("change", (event) => {
-    game.setFastMode(event.target.checked);
+  // Same click-toggle + aria-pressed pattern as powerbetBtn below, now that Fast is a
+  // real <button> rather than a checkbox-driven switch — fastEnabled is the local
+  // source of truth for the UI state, game.setFastMode() the one for gameplay.
+  let fastEnabled = false;
+  fastToggle.addEventListener("click", () => {
+    fastEnabled = !fastEnabled;
+    fastToggle.classList.toggle("fast-toggle--active", fastEnabled);
+    fastToggle.setAttribute("aria-pressed", String(fastEnabled));
+    game.setFastMode(fastEnabled);
   });
 
   // Purely visual/state sync, driven directly off spinSequencer.isForceArmed() (no

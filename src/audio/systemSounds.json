@@ -3,63 +3,83 @@
   "id": "systemSounds",
   "sounds": [
     {
-      "name": "moneyCounter02",
+      "name": "counterMain",
+      "start": 0,
+      "duration": 4.1
+    },
+    {
+      "name": "counterBubbles",
       "start": 5,
       "duration": 4.1
     },
     {
-      "name": "moneyCounterEnd",
+      "name": "counterDigital",
       "start": 10,
+      "duration": 4.1
+    },
+    {
+      "name": "counterEnd",
+      "start": 15,
       "duration": 1.095
     },
     {
+      "name": "counterWood",
+      "start": 17,
+      "duration": 4.1
+    },
+    {
+      "name": "counterZap",
+      "start": 22,
+      "duration": 4.1
+    },
+    {
       "name": "uiBet",
-      "start": 12,
+      "start": 27,
       "duration": 0.428
     },
     {
       "name": "uiClick",
-      "start": 13,
+      "start": 28,
       "duration": 0.42
     },
     {
       "name": "uiDash",
-      "start": 14,
-      "duration": 0.385
+      "start": 29,
+      "duration": 0.645
     },
     {
       "name": "uiHover",
-      "start": 15,
+      "start": 30,
       "duration": 0.311
     },
     {
       "name": "uiMenuOff",
-      "start": 16,
+      "start": 31,
       "duration": 0.519
     },
     {
       "name": "uiMenuOn",
-      "start": 17,
+      "start": 32,
       "duration": 0.447
     },
     {
       "name": "uiPulse",
-      "start": 18,
+      "start": 33,
       "duration": 0.575
     },
     {
       "name": "uiReelStart",
-      "start": 19,
+      "start": 34,
       "duration": 0.492
     },
     {
       "name": "uiSlider",
-      "start": 20,
+      "start": 35,
       "duration": 0.308
     },
     {
       "name": "uiTransition",
-      "start": 21,
+      "start": 36,
       "duration": 1.82
     }
   ]
