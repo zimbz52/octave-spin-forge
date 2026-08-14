@@ -6,7 +6,12 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 41
+Read this file first in any new session on this project. It reflects the state after Step 42
+(Neon Drive's audio bank refreshed to the current convention — `musicIntense`/`musicBigWin` added,
+a `smallWin01-04`→`winSmall01-04` naming slip fixed at the sync-drive source before copying in,
+and a new `THEME_BPM.neondrive = 80` entry so the adaptive-layer timing quantizes correctly. See
+"Refreshing Neon Drive to the current bank convention (Step 42)" below).
+Before that: Step 41
 (kickplate control rework, done without pushing per the user's request — still local-only: the
 bet-selector is now a proper dark bordered pill, matching every other readout's monospace font,
 centered on its own row directly below Spin with equal literal clearance from Spin's border above
@@ -3059,6 +3064,31 @@ without pushing per the user's request (still local-only as of this writing):
   holding the pre-edit sprite list (this project's usual stale-cache/stale-module-instance
   pattern, see "Known environment gotchas" item 1), not a failed edit; a genuinely fresh load
   (new tab, cache-busted) confirmed the fix works correctly on the first real try.
+
+---
+
+## Refreshing Neon Drive to the current bank convention (Step 42)
+
+Neon Drive was the last theme with a real audio bank still on the old, pre-Step-35 convention
+(bare `musicMain` only, no `musicIntense`/`musicBigWin` adaptive layers) — synced from the drive's
+`neondriveSounds_v01`.
+
+- **Naming slip caught before copying anything in**: the sync source had the small-win flavor
+  sprites as `smallWin01-04` (word order reversed) instead of the `winSmall01-04` every other
+  theme and the code itself expect (`ThemeAudio._randomAvailableIndexedName("winSmall")`). Per
+  standing preference, asked the user rather than silently renaming or writing fallback code for
+  it — confirmed as unintentional, fix requested at the source. Renamed in the sync-drive master
+  (`G:\...\spritesheets\neondriveSounds_v01.json`) *before* copying into the project, so the fix
+  survives the next sync instead of needing to be reapplied.
+- **BPM**: Neon Drive had no `THEME_BPM` entry (`ThemeAudio.js`) — without one, the new
+  `musicIntense`/`musicBigWin` layers' quantized timing (Big Win entry, Turbo reel-stop) would've
+  silently guessed a 120 BPM default instead of the theme's real tempo. Asked the user; added
+  `neondrive: 80`.
+- Copied `neondriveSounds_v01.json` → `src/audio/neondriveSounds.json` and
+  `neondriveSounds_v01.mp3` → `assets/23/sounds/neondriveSounds.mp3` (post-rename). Verified live:
+  `themeAudio._bpm === 80` once Neon Drive loads, `musicIntense`/`musicBigWin` both present, a real
+  small win played `winSmall04` (confirming the rename took), zero console warnings. A forced Grand
+  Win also confirmed `musicBigWin` fires correctly.
 
 ---
 

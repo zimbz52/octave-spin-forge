@@ -42,6 +42,7 @@ const THEME_BPM = {
   china: 120,
   gangster: 100,
   mexico: 130,
+  neondrive: 80,
 };
 
 // Big Win quantized entry: both music layers are hard-ducked to silence together the
