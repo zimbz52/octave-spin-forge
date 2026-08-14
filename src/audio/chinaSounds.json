@@ -123,16 +123,6 @@
       "duration": 1.554
     },
     {
-      "name": "winSmallDigits",
-      "start": 119,
-      "duration": 5.038
-    },
-    {
-      "name": "winSmallDigitsEnd",
-      "start": 125,
-      "duration": 0.447
-    },
-    {
       "name": "winSymbol01",
       "start": 126,
       "duration": 1.214

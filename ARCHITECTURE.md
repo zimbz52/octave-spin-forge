@@ -2225,7 +2225,17 @@ floating dock). **The floating dock was chosen.** What that means concretely:
     inside `init()`'s synchronous path, before `welcomeScreen.waitForStart()` is awaited, is a single
     point of failure for the whole app** — prefer guarding new lookups there, or wrap `init()` itself
     in a `.catch()` that at least logs, rather than assuming a `getElementById` will always succeed
-    just because the current on-disk HTML matches.
+    just because the current on-disk HTML matches. **Recurred again later, confirmed as pure cache
+    this time**: after further markup/JS churn (the bet-selector pill rework, the Fast-toggle
+    checkbox→button rework), the user hit "Initialize Engine does nothing" a second time. A fresh
+    tab reproduced nothing (worked first try, zero console errors) and a full DOM/id cross-check
+    found no mismatch — but the user then confirmed it independently by loading the page in an
+    **Incognito window, where it worked immediately**. Incognito has no disk cache to begin with, so
+    this is about as clean a confirmation as this gotcha gets: **when this symptom recurs, checking
+    in Incognito first is faster and more conclusive than re-auditing the DOM** — a clean load there
+    means the code is fine and it's purely a stale-cache artifact on the regular profile.
+    `init()` still has no top-level `.catch()` as of this writing — the underlying single-point-of-
+    failure risk described above is unchanged, just not what fired this particular time.
 
 ---
 
@@ -3031,6 +3041,24 @@ without pushing per the user's request (still local-only as of this writing):
   that actually reset, which turned out to be tool round-trip overhead pushing the real gap past
   1000ms, not a bug): a 700ms gap now bends (`1.0` → `1.05`), an 1100ms gap still resets
   (`1.0` → `1.0`).
+- **China's theme-specific small-win money counter removed**, per an explicit user request —
+  `winSmallDigits`/`winSmallDigitsEnd` deleted from `src/audio/chinaSounds.json` (China was the
+  only bank that ever defined this pair; see Step 21's "Adding China" section). No other code
+  change was needed: `ThemeAudio.hasSmallWinDigits()`/`playSmallWinDigits()`/`stopSmallWinDigits()`
+  already check `_spriteNames.has("winSmallDigits")` fresh on every roll-up rather than caching a
+  per-theme flag, and `audioHooks.js`'s `startSmallWinDigits()` already falls back to
+  `systemAudio.playSmallWinDigits()` whenever the active theme doesn't define its own pair — this
+  is exactly the same fallback path every other theme has always used, China just now takes it
+  too. `busRouting.js`'s `busWinsSmall` comment (previously citing China's pair by name) updated
+  to reflect no bank currently defines it. Verified live: fresh-loaded China now has
+  `hasSmallWinDigits() === false`, and a real small win played `counterBubbles` → `counterEnd`
+  (the generic systemic pool) instead of `winSmallDigits`/`winSmallDigitsEnd`, zero console
+  warnings. **Note on the investigation immediately before this fix**: an initial verification
+  attempt appeared to show China still playing the old `winSmallDigits`/`winSmallDigitsEnd` after
+  the JSON edit — this was purely the already-running page's in-memory `ThemeAudio` instance still
+  holding the pre-edit sprite list (this project's usual stale-cache/stale-module-instance
+  pattern, see "Known environment gotchas" item 1), not a failed edit; a genuinely fresh load
+  (new tab, cache-busted) confirmed the fix works correctly on the first real try.
 
 ---
 

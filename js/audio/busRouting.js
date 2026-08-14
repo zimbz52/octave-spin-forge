@@ -16,9 +16,11 @@ const BUS_RULES = [
   // audioUtils.bpmFromSpriteName()) — rather than matching the bare name only.
   { bus: "busMusic", test: (name) => /^(musicMain|musicIntense|musicBigWin)(_\d{2,3})?$/.test(name) },
   { bus: "busAtmosphere", test: (name) => name === "gameAmbLP" || name === "gameStart" },
-  // winSmall01-04 (the flavor layer) and winSmallDigits/winSmallDigitsEnd (the counter
-  // roll-up bed + its completion sting, see "Adding China" below) share this bus — both
-  // are "small win" audio, just different roles within it.
+  // winSmall01-04 (the flavor layer) shares this bus. winSmallDigits/winSmallDigitsEnd
+  // (the theme-specific counter roll-up bed + its completion sting) would too, if any
+  // bank still defined them — China was the only one that ever did, and its pair was
+  // removed at the user's request so it now falls back to the generic systemic
+  // counter (SystemAudio.js's counterMain/etc., not bus-routed) like every other theme.
   { bus: "busWinsSmall", test: (name) => name.startsWith("winSmall") },
   // winSymbol01-04/winSymbolWild/winSymbolScatter (the symbol04 legacy fallback, see
   // ThemeAudio.playSymbolWin) all share this one bus — same "symbol-specific win" role.
