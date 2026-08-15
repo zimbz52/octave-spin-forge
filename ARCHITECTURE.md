@@ -6,7 +6,21 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 48
+Read this file first in any new session on this project. It reflects the state after Step 50
+(the welcome card's Start-button state and slider state now share a single fixed-height
+`.welcome-screen__stage` wrapper, so the card no longer visibly resizes/jumps when Start is
+tapped and the slider takes its place — and the button now sits at the exact vertical position
+the slider occupies, since both are centered within the same reserved box. See "Welcome screen:
+equal-height stage for the Start button and slider (Step 50)" below).
+Before that: Step 49
+(fixed the engine slider's audio unlock being unreliable on mobile — some mobile browsers only
+validate AudioContext.resume() against a *completed* tap, not a pointerdown that goes straight
+into a drag. Added a plain `<button>` "Start" gate (stage 1, the real unlock now, main welcome
+text above it) before the slider (stage 2, hidden until stage 1 completes, now just a tactile
+flourish). Also fixed a real bug found along the way: `[hidden]` doesn't override an explicit
+`display` declared in author CSS, needed an `.engine-slider[hidden] { display: none; }` override.
+See "Two-stage welcome gate: a plain Start button before the slider (Step 49)" below).
+Before that: Step 48
 (fixed the floating docks covering Spin on mobile — confirmed on a realistic 375×650 viewport that
 both `.audio-dock` and `.audio-profiler` overlapped Spin and the bet-selector, since the previous
 reserved-padding fix only worked while the cabinet had slack to spare. `.audio-profiler` (dev-only)
@@ -3496,6 +3510,88 @@ both `true`), `document.documentElement.scrollHeight` (735) genuinely exceeding 
 confirmed the dock renders correctly once scrolled to. Desktop (800×757) screenshotted for
 comparison — pixel-identical to before, confirming the `max-width: 600px` gate keeps this fix fully
 scoped to mobile.
+
+**Same-step follow-up, reported by the user right after**: the newly-reachable area behind the dock
+was a hard, ugly solid-black cutoff instead of the theme's own background photo continuing behind
+it. Root cause: `html, body { height: 100% }` (top of file) pins body's own border box to the
+viewport regardless of `min-height` set further down — a fixed height, not just a floor. The
+now-in-flow `.audio-dock` still visually overflowed past that fixed box fine (default visible
+overflow, nothing clips it) — but `background-size: cover` only ever paints within the element's
+*own box*, so the overflowing region past it showed through to `:root`'s `color-scheme: dark`
+default canvas (solid black) instead of the photo. Fixed with one more mobile-only override:
+`body { height: auto; }`, letting body's box genuinely grow to contain its now-taller stacked
+content instead of letting it spill past unaccounted for — confirmed `body.offsetHeight` now equals
+`body.scrollHeight` (759 = 759, was 650 vs. 732), and the Egypt background photo visibly continues
+behind the dock in a follow-up screenshot instead of cutting off.
+
+---
+
+## Two-stage welcome gate: a plain Start button before the slider (Step 49)
+
+The user reported that on mobile, the first tap-and-slide on the engine slider (Step 46) did not
+actually unlock the sound system. Root cause: some mobile browsers (iOS Safari in particular) only
+reliably validate a synchronous `AudioContext.resume()` call against a *completed* tap
+(`touchend`/`click`), not a bare `touchstart`/`pointerdown` that goes straight into a continuous
+drag with no discrete tap ever completing — which is exactly what the slider's grab-triggered
+unlock (Step 46) was calling `unlockAudioContext()` from.
+
+**Fix**: a two-stage gate instead of relying on the slider alone.
+- **Stage 1** — a new plain `<button>` (`#welcome-tap-start-btn`, `.welcome-screen__start-btn`),
+  the main welcome text sitting above it per the request this shipped under. A plain click is the
+  one gesture every browser, mobile included, reliably honors a synchronous `resume()` against.
+  Brought back the gold-pulse button treatment Step 43 removed when the slider replaced the old
+  single button outright (`welcome-screen-start-btn-pulse` keyframes) — same established
+  "primary CTA" visual language as before.
+- **Stage 2** — the same engine slider as before, now hidden (`hidden` attribute on `#engine-slider`
+  in the markup) until stage 1 completes. Tapping Start calls `unlockAudioContext()` (the *real*
+  unlock now), hides the button, and reveals the slider — which becomes a purely tactile flourish
+  gate on top of already-unlocked audio, not the sole point of failure for it. Its own
+  pointerdown-triggered `unlockAudioContext()` call (Step 46) stays as a harmless, idempotent
+  safety net, not because it's still load-bearing.
+- `waitForStart()`/`dismiss()` are untouched — `waitForStart()` still resolves via the slider's
+  existing synthetic click on the hidden `#welcome-start-btn` proxy once *its* drag crosses the
+  unlock threshold, same "move to the next screen" signal as before, just downstream of two unlock
+  attempts now instead of one.
+
+**A real bug found while wiring this up**: `.engine-slider[hidden]` didn't actually hide the
+slider — the browser's own default `[hidden] { display: none }` UA-stylesheet rule loses to any
+explicit `display` declared in author CSS (`.engine-slider { display: flex; ... }`) regardless of
+which loads later, since author styles always beat UA styles at equal specificity. Fixed with an
+explicit `.engine-slider[hidden] { display: none; }` override (element+attribute selector, higher
+specificity than the bare class rule) — the same "always test the computed style, don't trust
+`hidden` alone once a `display` is declared" lesson as this file's other CSS-cascade gotchas.
+
+**Verified**: a genuine trusted click (this session's Browser-pane `computer` tool, not scripted)
+took `Howler.ctx.state` from `suspended` to `running`, hid the Start button, and revealed the
+slider — confirmed on both desktop and mobile viewports. Full downstream flow re-confirmed intact:
+slider drag still fires its own tactile hooks, `waitForStart()`/`dismiss()` still resolve
+correctly, terminal still reveals, Vintage Arcade's menu ambience (Step 47) still kicks in right
+after. Zero console errors.
+
+---
+
+## Welcome screen: equal-height stage for the Start button and slider (Step 50)
+
+The two-stage gate (Step 49) introduced a visible problem: the plain Start button (45px tall) and
+the engine slider (92px tall) are naturally very different heights, so the whole welcome card
+visibly resized and jumped the instant Start was tapped and the slider took its place. The user
+also wanted the button positioned at the same vertical spot the slider occupies, not wherever it
+happened to land above it.
+
+**Fix**: a new `.welcome-screen__stage` wrapper (`index.html`) around both
+`#welcome-tap-start-btn` and `#engine-slider`, sized to the taller of the two
+(`min-height: 92px`) and flex-centered (`align-items: center; justify-content: center`). Both
+elements now live in the same reserved box and are simply toggled via their `hidden` attribute —
+since the box's size never changes, neither does the card's, and centering both within it
+guarantees the button's vertical center lands exactly on the slider's, by construction rather than
+per-state coordination in JS. The `margin-top: 8px` previously duplicated on
+`.welcome-screen__start-btn` and `.engine-slider` individually was consolidated onto the wrapper.
+
+**Verified** via `getBoundingClientRect()` on a fresh page load and after a scripted click on
+Start: card height identical in both states (322.3125px, zero delta), and the button's vertical
+center (532.16px) exactly matches the slider's vertical center (532.16px) once revealed. Confirmed
+visually with a screenshot as well. No regressions — slider drag, `waitForStart()`/`dismiss()`,
+and the rest of the flow all unaffected, since only layout/wrapper markup changed.
 
 ---
 

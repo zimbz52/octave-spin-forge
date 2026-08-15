@@ -228,12 +228,15 @@
   </div>
 
   <!-- Master audio gate: loads before even the startup terminal (z-index 400 vs the
-       terminal's 300), so the very first thing on screen is one deliberate drag-to-
-       unlock gesture that resolves the shared AudioContext. The terminal underneath is
-       already rendered and wired the instant this is dismissed — nothing else waits on
-       this beyond that. A physical, notched engine slider (ported from the sibling
-       Tactile project's identical interaction — see WelcomeScreen.js) replaces the old
-       plain button: the player has to actually drag the thumb home, not just click. -->
+       terminal's 300), so the very first thing on screen is a two-stage unlock. Stage
+       1 (#welcome-tap-start-btn below) is a plain tap/click button — the one gesture
+       every browser reliably validates a synchronous AudioContext.resume() against,
+       including mobile Safari, which was found to *not* reliably honor a resume()
+       fired from pointerdown/touchstart alone (the engine slider's own grab handler —
+       see WelcomeScreen.js) if the tap-then-drag never completes as a discrete tap.
+       Stage 2 is the same physical, notched engine slider from before (ported from the
+       sibling Tactile project — see WelcomeScreen.js), now purely a tactile flourish
+       gate on top of already-unlocked audio, not the sole point of failure for it. -->
   <div class="welcome-screen" id="welcome-screen">
     <div class="welcome-screen__card">
       <p class="welcome-screen__text">Welcome to the Octave Spin Forge!</p>
@@ -244,18 +247,35 @@
         Please use headphones for the optimal mixing and spatial experience.
       </p>
 
-      <div class="engine-slider">
-        <div class="engine-slider__track">
-          <div class="engine-slider__notches" aria-hidden="true">
-            <span></span><span></span><span></span><span></span>
-            <span></span><span></span><span></span><span></span>
+      <!-- Shared, fixed-height stage for whichever of the two is currently showing —
+           see .welcome-screen__stage in styles.css for why: the button (45px) and the
+           slider (92px) are naturally very different heights, so without a reserved,
+           shared space the whole card visibly resized/jumped the instant Start got
+           tapped and the slider took its place. Centering both within this same box
+           also puts the button at the slider's own vertical position, not just
+           "wherever it happens to land" above it. -->
+      <div class="welcome-screen__stage">
+        <button
+          id="welcome-tap-start-btn"
+          class="welcome-screen__start-btn"
+          type="button"
+        >
+          Start
+        </button>
+
+        <div class="engine-slider" id="engine-slider" hidden>
+          <div class="engine-slider__track">
+            <div class="engine-slider__notches" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <div class="engine-slider__fill"></div>
+            <button class="engine-slider__thumb" type="button" aria-label="Drag to initialize sound engine">
+              <span class="engine-slider__grip"></span>
+            </button>
           </div>
-          <div class="engine-slider__fill"></div>
-          <button class="engine-slider__thumb" type="button" aria-label="Drag to initialize sound engine">
-            <span class="engine-slider__grip"></span>
-          </button>
+          <div class="engine-slider__label">INITIALIZE SOUND ENGINE</div>
         </div>
-        <div class="engine-slider__label">INITIALIZE SOUND ENGINE</div>
       </div>
     </div>
 

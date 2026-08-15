@@ -2,32 +2,35 @@ import { unlockAudioContext } from "../audio/audioUtils.js";
 import { playSliderEngage, playSliderTick, playSliderCancel, playSliderLock, playSliderReveal } from "../audio/audioHooks.js";
 
 // The master audio gate: a full-screen overlay that loads before even the startup
-// terminal, so the very first thing a player can do on this page is the one deliberate
-// gesture that unlocks the shared AudioContext. Sits above the terminal (z-index 400 vs
-// 300) and simply covers it until dismissed — the terminal underneath is already
-// rendered and wired, this just blocks it from being reachable a moment longer.
+// terminal, so the very first thing a player can do on this page is unlock the shared
+// AudioContext. Sits above the terminal (z-index 400 vs 300) and simply covers it
+// until dismissed — the terminal underneath is already rendered and wired, this just
+// blocks it from being reachable a moment longer.
 //
-// The gate is a drag-to-unlock "engine slider" (a heavy, notched thumb the player has
-// to physically pull across, not just click) rather than a plain button — see
-// _wireEngineSlider()/_snapAndUnlock() below, ported from the sibling Tactile project's
-// identical interaction (D:\DEV\Claude\Tactile\js\main.js).
+// Two-stage gate, Step 49: Step 46 unlocked audio from the engine slider's own grab
+// (pointerdown/touchstart) so the whole drag could make sound, not just the final
+// reveal — but on mobile (confirmed on real devices, not just this project's
+// Browser-pane emulation), that unlock was unreliable: some mobile browsers only
+// validate a synchronous AudioContext.resume() call against a *completed* tap
+// (touchend/click), not a bare touchstart/pointerdown that goes straight into a
+// continuous drag with no discrete tap ever completing. A plain button's click event
+// is the one gesture every browser, mobile included, reliably honors this against.
 //
-// Audio unlock timing, Step 46: unlockAudioContext() is called from the very first
-// pointerdown/touchstart on the thumb — the instant the player grabs it — not once the
-// drag succeeds. Browsers only require *one* trusted gesture to unlock audio, and
-// grabbing the thumb is as legitimate a gesture as the click that used to do it, so
-// there's no reason to make the whole drag silent while waiting for it to finish. This
-// is what lets every notch tick/cancel/lock sound below actually play live, in real
-// time, instead of only the final reveal being audible. main.js's own
-// `await welcomeScreen.waitForStart(); unlockAudioContext();` call is now a redundant
-// (harmless — see unlockAudioContext()'s own "safe any number of times" contract)
-// safety net for the case _wireEngineSlider() guards out below (missing markup) and
-// this whole class never gets a chance to unlock anything itself.
+// So: stage 1 is _wireStartButton() below, a plain tap/click "Start" button — the main
+// welcome text sits above it, per the request this shipped under. Tapping it is the
+// *real* unlock now. Stage 2 is the same engine slider as before (see
+// _wireEngineSlider()/_snapAndUnlock(), ported from the sibling Tactile project's
+// identical interaction, D:\DEV\Claude\Tactile\js\main.js) — hidden until stage 1
+// completes, at which point it's purely a tactile flourish gate on top of audio that's
+// already unlocked, not the sole point of failure for it anymore. Its own
+// pointerdown-triggered unlockAudioContext() call stays as a harmless, idempotent
+// safety net (see unlockAudioContext()'s own "safe any number of times" contract), not
+// because it's still load-bearing.
 //
 // waitForStart() itself is untouched: it still resolves via a real click on a hidden
-// #welcome-start-btn proxy the instant the drag crosses its unlock threshold — that's
-// just the existing "move on to the next screen" signal now, unrelated to the audio
-// unlock, which already happened earlier.
+// #welcome-start-btn proxy the instant the *slider's* drag crosses its unlock
+// threshold — that's the existing "move on to the next screen" signal, unrelated to
+// either audio unlock (both already happened well before this by the time it fires).
 const NOTCH_COUNT = 8;
 const UNLOCK_THRESHOLD = 0.94;
 
@@ -35,7 +38,25 @@ export class WelcomeScreen {
   constructor(rootEl, startBtnEl) {
     this.rootEl = rootEl;
     this.startBtnEl = startBtnEl;
+    this._wireStartButton();
     this._wireEngineSlider();
+  }
+
+  // Stage 1 of the gate — see the class-level comment above for why this exists
+  // alongside the slider. Guarded (no-ops if the markup is missing) for the same
+  // single-point-of-failure reason _wireEngineSlider() below is.
+  _wireStartButton() {
+    const startBtn = this.rootEl.querySelector(".welcome-screen__start-btn");
+    const slider = this.rootEl.querySelector(".engine-slider");
+    if (!startBtn || !slider) return;
+
+    startBtn.addEventListener("click", () => {
+      // The reliable unlock — a plain click, not a mid-drag gesture. See the
+      // class-level comment for why this specifically is what fixes the mobile bug.
+      unlockAudioContext();
+      startBtn.hidden = true;
+      slider.hidden = false;
+    });
   }
 
   // Resolves once the player clicks (or Enter/Space-activates) the start button — or,
@@ -120,10 +141,10 @@ export class WelcomeScreen {
     const onPointerDown = (event) => {
       if (unlocked) return;
       dragging = true;
-      // The actual audio unlock — see the class-level comment above for why this
-      // fires here, on grab, rather than waiting for the drag to succeed. Every
-      // fresh grab re-fires this (e.g. after a spring-back), not just the first —
-      // unlockAudioContext() is a safe no-op once already running.
+      // A harmless safety-net unlock call, not the real one anymore — see the
+      // class-level comment (Step 49) for why the actual unlock moved to the plain
+      // Start button, stage 1 of the gate. unlockAudioContext() is a safe no-op once
+      // already running, so this costs nothing even though it's redundant by now.
       unlockAudioContext();
       playSliderEngage();
       // Can throw NotFoundError if the browser doesn't consider event.pointerId an
@@ -173,12 +194,12 @@ export class WelcomeScreen {
   // Snaps the thumb fully home, fires the lock/reveal sounds and the shutter-wipe, and
   // dispatches the synthetic click that resolves waitForStart() — all synchronously,
   // inside the same pointerup/touchend call stack the drag that just crossed the
-  // threshold is already running in. Audio was already unlocked back on the initial
-  // grab (see the class-level comment and onPointerDown above), so nothing here is
-  // load-bearing for that anymore — kept synchronous anyway as a matter of not
-  // introducing a delay for no reason. The shutter/dismiss() fade that follows is
-  // purely cosmetic and runs on its own clock afterward (see styles.css's
-  // .welcome-screen--fading transition-delay).
+  // threshold is already running in. Audio was already unlocked back at stage 1 (the
+  // Start button, well before the slider was even visible — see the class-level
+  // comment), so nothing here is load-bearing for that anymore — kept synchronous
+  // anyway as a matter of not introducing a delay for no reason. The shutter/dismiss()
+  // fade that follows is purely cosmetic and runs on its own clock afterward (see
+  // styles.css's .welcome-screen--fading transition-delay).
   _snapAndUnlock(travel, label, setPosition) {
     setPosition(travel);
     label.textContent = "ENGINE ONLINE";

@@ -711,6 +711,66 @@ body {
   text-shadow: 0 0 10px rgba(212, 175, 55, 0.35);
 }
 
+/* Shared, fixed-height stage for the Start button and the engine slider — see
+   index.html's comment on .welcome-screen__stage for why: they're naturally very
+   different heights (button ~45px, slider ~92px), so without this the whole card
+   visibly resized/jumped the instant Start was tapped and the slider took its place.
+   min-height matches the taller of the two (the slider); centering both here also
+   puts the button at the slider's own vertical position instead of wherever it
+   happens to land above it. */
+.welcome-screen__stage {
+  width: 100%;
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+/* ---------- Stage 1: plain tap-to-unlock button (Step 49) ----------
+   The reliable half of the two-stage gate — see index.html's comment above the
+   welcome screen for why this exists alongside the slider. Same gold-pulse treatment
+   the old single Initialize Engine button had (Step 43 removed it when the slider
+   replaced that button outright; brought back here, on this new button, since the
+   slider is no longer the first/only thing a player interacts with). */
+.welcome-screen__start-btn {
+  padding: 14px 34px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #241a02;
+  background: radial-gradient(circle at 35% 30%, #f6d97a, var(--cabinet-accent) 60%, #a3821f 100%);
+  animation: welcome-screen-start-btn-pulse 1.8s ease-in-out infinite;
+  transition: transform 0.06s ease, filter 0.15s ease;
+}
+
+.welcome-screen__start-btn:hover {
+  filter: brightness(1.1);
+}
+
+.welcome-screen__start-btn:active {
+  transform: translateY(2px);
+}
+
+.welcome-screen__start-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+@keyframes welcome-screen-start-btn-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.55), 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 14px rgba(212, 175, 55, 0), 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+
 /* Real click-dispatch target for WelcomeScreen.waitForStart() — see index.html's
    #welcome-start-btn comment. Never shown; display:none doesn't block .click(). */
 .welcome-screen__start-proxy {
@@ -728,7 +788,16 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  margin-top: 8px;
+}
+
+/* Step 49: hidden via the HTML `hidden` attribute until the Start button (stage 1)
+   reveals it — but the browser's own default `[hidden] { display: none }` UA-stylesheet
+   rule loses to the plain display:flex above (author CSS always beats UA CSS at equal
+   specificity, regardless of which loads later), so without this the slider showed up
+   immediately despite the attribute being present. This re-asserts it at higher
+   specificity (element+attribute vs. plain class) so hidden actually hides it again. */
+.engine-slider[hidden] {
+  display: none;
 }
 
 .engine-slider__track {
@@ -2038,6 +2107,17 @@ body {
    general lesson this confirms. */
 @media (max-width: 600px) {
   body {
+    /* html,body{height:100%} (top of file) pins body's own border box to the
+       viewport regardless of min-height further down — a fixed height, not just a
+       floor. The now-in-flow .audio-dock below still visually overflows past that
+       fixed box just fine (default visible overflow, nothing clips it) — but
+       background-size:cover only ever paints within the element's own box, so the
+       overflowing region past it showed through to :root's color-scheme:dark default
+       canvas (solid black) instead of the theme photo, reading as an ugly hard cutoff
+       right where the dock sits. auto lets body's box genuinely grow to contain its
+       now-taller stacked content instead of just letting it spill past unaccounted
+       for, which is what actually gets the background to extend the rest of the way. */
+    height: auto;
     flex-direction: column;
     /* flex-direction:column swaps body's main/cross axes — justify-content now
        controls the *vertical* axis instead of align-items. Plain "center" here would
