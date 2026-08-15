@@ -6,7 +6,16 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 47
+Read this file first in any new session on this project. It reflects the state after Step 48
+(fixed the floating docks covering Spin on mobile — confirmed on a realistic 375×650 viewport that
+both `.audio-dock` and `.audio-profiler` overlapped Spin and the bet-selector, since the previous
+reserved-padding fix only worked while the cabinet had slack to spare. `.audio-profiler` (dev-only)
+now hides below `max-width: 600px`; `.audio-dock` drops out of fixed positioning and joins normal
+flow, stacked below the cabinet, page scrolls to reach it. Along the way found a real CSS-cascade
+bug — a media-query override positioned before its base rule in source order silently loses even
+on a matching viewport — see "Known environment gotchas" item 14. See "Mobile: the floating docks
+were covering Spin (Step 48)" below).
+Before that: Step 47
 (Vintage Arcade's `gameAmbLP`/`gameStart` now play as generic menu ambience while the player is
 still choosing a theme in the startup terminal — not its music, deliberately. New `skipMusic`
 option on `ThemeAudio.loadTheme()`, fired unawaited right after the welcome screen dismisses.
@@ -2287,6 +2296,22 @@ floating dock). **The floating dock was chosen.** What that means concretely:
     means the code is fine and it's purely a stale-cache artifact on the regular profile.
     `init()` still has no top-level `.catch()` as of this writing — the underlying single-point-of-
     failure risk described above is unchanged, just not what fired this particular time.
+14. **A media-query override placed *before* the base rule it's meant to override, in source
+    order, silently loses** — even when the media condition genuinely matches. Hit in Step 48:
+    `@media (max-width: 600px) { .audio-dock { position: static; ... } }` was written right where
+    the old mobile-only tweak used to live, well *before* `.audio-dock { position: fixed; ... }`'s
+    own full rule block further down the file. `window.matchMedia(...).matches` was `true`,
+    `document.styleSheets` showed the override rule correctly parsed and present — and
+    `getComputedStyle` still reported `position: fixed`, because a `@media`-wrapped selector has
+    the *exact same specificity* as the same selector bare — media queries are purely a conditional
+    wrapper, not a specificity boost — so at equal specificity, the rule that's later in *source
+    order* wins, full stop, regardless of which one is behind a currently-true condition. This is
+    genuinely easy to miss by inspection (`grep`-ing for the override rule finds it just fine, right
+    where you'd expect it) — it only shows up by actually testing the computed style at the matching
+    viewport, which is what caught it here. **Fix: media-query overrides for a selector must be
+    positioned *after* every rule for that same selector** (including the base rule and any of its
+    own sub-element rules) — moved this project's mobile overrides to the literal end of the file to
+    guarantee that regardless of future reordering elsewhere.
 
 ---
 
@@ -3427,6 +3452,50 @@ theme's music track before the player has picked anything.
 no gap) that the *same* already-playing ambient loop just continues, with music layering in on top
 a beat later. Zero unexpected console errors (only the same synthetic-event `navigator.vibrate`
 artifact noted in every other Step's verification this session).
+
+---
+
+## Mobile: the floating docks were covering Spin (Step 48)
+
+The user reported the floating corner docks (`.audio-dock` bottom-left, `.audio-profiler`
+bottom-right — both `position: fixed`, anchored to the viewport, costing zero layout space by
+design on desktop) were covering the Spin button "almost all the time" on mobile. Measured and
+confirmed on a realistic 375×650 viewport (simulating a real phone's browser-chrome-shrunk visible
+area — noticeably shorter than the 375×812 chrome-collapsed viewport this project's Browser-pane
+tool emulates, which is why this had gone unnoticed): both docks overlapped Spin, and together
+covered almost the entire bet-selector below it.
+
+The previous mobile fix here (`body { padding-bottom: 96px; }`, reserving space so "safe center"
+had room to shift the cabinet up out of the docks' reach) only ever worked while the cabinet had
+slack to spare — once the cabinet's own height (grown substantially since that fix, across the
+bet-selector row, the engine slider, etc.) exceeds the real visible viewport, centering falls back
+to top-aligned and the cabinet's bottom runs straight into the fixed docks regardless of any
+padding reserved for them.
+
+**Real fix**, at `@media (max-width: 600px)`:
+- `.audio-profiler` (the Signal Monitor — explicitly a dev-only debug HUD, never player-facing,
+  per its own doc comment) is simply hidden.
+- `.audio-dock` (genuinely player-facing: Master Mute, volume, theme select) drops
+  `position: fixed` for `position: static`, joining normal document flow, stacked below the
+  cabinet instead of pinned to a corner.
+- `body` switches to `flex-direction: column` so the cabinet and the now-in-flow dock stack
+  vertically, with `justify-content: flex-start` (not `center`) so the swapped main axis can't
+  reintroduce the same unreachable-top-overflow problem `align-items: safe center` exists to avoid
+  on the *other* axis — see "Known environment gotchas" item 14 below for the CSS-cascade bug this
+  surfaced along the way (a media-query override placed before its base rule in source order
+  silently loses, even on a matching viewport) and why the whole block ended up at the literal end
+  of the file.
+- The page now scrolls to reach the dock if the stack is taller than the visible area — the
+  standard mobile pattern for "more controls than fit," replacing the previous silent,
+  unrecoverable overlap.
+
+**Verified**: on 375×650, `.audio-dock` computed `position: static`, `.audio-profiler` computed
+`display: none`, zero bounding-box overlap between Spin/the bet-selector and the dock (previously:
+both `true`), `document.documentElement.scrollHeight` (735) genuinely exceeding `clientHeight`
+(650) confirming the dock landed below the fold as intended rather than just off-screen. Screenshot
+confirmed the dock renders correctly once scrolled to. Desktop (800×757) screenshotted for
+comparison — pixel-identical to before, confirming the `max-width: 600px` gate keeps this fix fully
+scoped to mobile.
 
 ---
 

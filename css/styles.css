@@ -121,23 +121,6 @@ body {
   gap: 8px;
 }
 
-/* On narrow viewports .app is close to full-width, so the two fixed-position corner
-   docks (.audio-dock bottom-left, .audio-profiler bottom-right) — both anchored to the
-   *viewport*, not to .app or .cabinet__frame — sit almost the full width of the
-   cabinet itself. body's "safe center" vertical centering has no idea they exist, so
-   with enough spare vertical height it can center .app right down into them: the
-   cabinet's bottom edge and the docks' top edges genuinely overlap (observed ~12px on
-   a 375x812 viewport), not just a near-miss. Reserving real bottom padding here
-   shrinks the box that "center" centers *within*, shifting the whole app up and out of
-   the docks' reach — cheaper and more robust than trying to compute the docks' exact
-   height/position from JS. 96px covers both docks' typical (not worst-case-expanded)
-   height with a margin; revisit if either dock's own height changes meaningfully. */
-@media (max-width: 600px) {
-  body {
-    padding-bottom: 96px;
-  }
-}
-
 /* ---------- Audio dock (floating: Master Mute, music fader, theme select) ---------- */
 /* Deliberately outside the .app document flow — like the Signal Monitor panel it
    mirrors (opposite corner), it costs zero vertical layout space, which is what
@@ -2021,5 +2004,66 @@ body {
   cursor: default;
   filter: grayscale(0.4) brightness(0.85);
   transform: none;
+}
+
+/* ---------- Mobile: floating docks can't stay free-floating (Step 48) ---------- */
+/* On narrow viewports, the two fixed-position corner docks (.audio-dock bottom-left,
+   .audio-profiler bottom-right) — both anchored to the *viewport*, not to .app or
+   .cabinet__frame — sit almost the full width of the cabinet itself, and on a real
+   phone's actual (browser-chrome-shrunk) visible height, this cabinet's own content is
+   simply taller than the available space. A reserved-bottom-padding trick (the
+   previous approach here) only helps while the cabinet has room to spare above the
+   docks; once it doesn't, "safe center" falls back to top-aligned and the cabinet's
+   own bottom — Spin, the bet-selector below it — runs straight into the fixed docks
+   regardless of any padding reserved for them. Confirmed measured on a realistic
+   375x650 viewport (simulating Safari's chrome-shrunk visible area, not the
+   chrome-collapsed 375x812 this project's Browser-pane tool emulates): Spin overlapped
+   by both docks, the bet-selector almost entirely covered by them.
+   Real fix: stop pretending these docks are free-floating chrome that costs no layout
+   space on mobile — they demonstrably do, the moment the viewport gets short enough.
+   .audio-profiler (an explicitly dev-only debug HUD, never player-facing — see its own
+   doc comment) is simply hidden below this breakpoint; .audio-dock (genuinely
+   player-facing: Master Mute, volume, theme select) drops out of fixed positioning and
+   joins normal document flow instead, stacked below the cabinet — see the overrides
+   below. The page scrolls if that combined stack is taller than the visible area,
+   which is the standard, expected mobile pattern for "more controls than fit," instead
+   of the previous silent, unrecoverable overlap.
+   Deliberately placed at the very end of the file, after every .audio-dock/
+   .audio-profiler rule above (including their own sub-element rules) — a media-query
+   override has the exact same specificity as the plain selector it's meant to beat, so
+   at equal specificity the later rule in *source order* wins regardless of whether the
+   media condition matches. Placed earlier in the file (where this used to live), the
+   base rules further down silently kept winning even on a matching viewport — found by
+   testing this fix, not by inspection; see "Known environment gotchas" below for the
+   general lesson this confirms. */
+@media (max-width: 600px) {
+  body {
+    flex-direction: column;
+    /* flex-direction:column swaps body's main/cross axes — justify-content now
+       controls the *vertical* axis instead of align-items. Plain "center" here would
+       reintroduce exactly the unreachable-top-overflow trap align-items:safe center
+       (above) exists to avoid, just on the other axis: justify-content's own "safe"
+       keyword doesn't have reliable enough cross-browser support to lean on for that
+       the way align-items:safe does. flex-start instead, relying on normal page
+       scroll (nothing in this file sets overflow:hidden on html/body) to reach
+       whatever doesn't fit above the fold — simpler and more robust than chasing
+       "safe" support for the axis that swapped. */
+    justify-content: flex-start;
+    padding-bottom: 24px;
+  }
+
+  .audio-profiler {
+    display: none;
+  }
+
+  .audio-dock {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    margin-top: 12px;
+    width: 100%;
+    max-width: 320px;
+  }
 }
 
