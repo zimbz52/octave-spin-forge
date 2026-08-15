@@ -47,10 +47,29 @@
   --metal-shadow: #1c1c1f;
 
   --radius-md: 12px;
+
+  /* Same pairing/rule as the sibling Tactile portfolio site: JetBrains Mono is the
+     base for every label/control/readout in this cabinet (reads as physical hardware
+     engraving); Space Grotesk is reserved for headline-scale, brand-carrying moments
+     only (the wordmark, the big win number, the welcome screen's opening line) — see
+     the selectors that opt into --font-display for the full, deliberately short list. */
+  --font-mono: "JetBrains Mono", "Courier New", monospace;
+  --font-display: "Space Grotesk", var(--font-mono), sans-serif;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Browsers don't inherit typography into form controls by default (a UA-stylesheet
+   quirk, not a bug) — every <button>/<select>/<input> in this cabinet was silently
+   falling back to the platform's default sans (Arial) regardless of body's
+   font-family, undiscovered until the Space Grotesk/JetBrains Mono pairing landed and
+   made the mismatch checkable. This is the fix (same pattern already used one-off on
+   .dev-mixer__export-btn, now applied everywhere) — every control now genuinely reads
+   as the mono "hardware engraving" it's meant to. */
+button, select, input, textarea {
+  font-family: inherit;
 }
 
 html, body {
@@ -89,7 +108,7 @@ body {
   background-repeat: no-repeat;
   /* Monospace everywhere, matching the startup terminal — the whole app is meant to
      read as one system now, not a sans-serif cabinet bolted onto a monospace intro. */
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   color: var(--text-light);
   padding: 14px;
 }
@@ -294,7 +313,7 @@ body {
 }
 
 .audio-dock__theme-label {
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.1em;
   color: var(--text-dim);
@@ -380,6 +399,12 @@ body {
 .cabinet__title {
   margin: 4px 0 0;
   text-align: center;
+  /* The closest thing this app has to a logo — Space Grotesk reads as a stronger
+     wordmark than mono here (see --font-display's rule in :root); weight bumped
+     since a grotesk at the old inherited default reads thin at this size. Letter-
+     spacing, color, and glow are unchanged. */
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 1.05rem;
   letter-spacing: 0.14em;
   color: var(--cabinet-accent);
@@ -498,7 +523,7 @@ body {
   justify-content: center;
   padding: 24px;
   background: #05060a;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
 }
 
 .startup-terminal__window {
@@ -653,7 +678,7 @@ body {
   justify-content: center;
   padding: 24px;
   background: #05060a;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   opacity: 1;
   transition: opacity 0.4s ease;
 }
@@ -661,6 +686,11 @@ body {
 .welcome-screen--fading {
   opacity: 0;
   pointer-events: none;
+  /* Lets the shutter sweep (.welcome-screen__shutter-blade, 0.45s) fully cover the
+     screen first before this fade — still driven by WelcomeScreen.dismiss()'s
+     unchanged transitionend-on-opacity logic — even starts, so the two read as one
+     sequence (wipe to black, then fade away) instead of visibly stacking. */
+  transition-delay: 0.48s;
 }
 
 .welcome-screen__card {
@@ -687,6 +717,10 @@ body {
 }
 
 .welcome-screen__text:first-child {
+  /* The one human-voiced line on the audio gate — Space Grotesk, not the mono every
+     other label/readout uses (see --font-display's rule in :root). The slider's own
+     "INITIALIZE SOUND ENGINE"/"ENGINE ONLINE" label stays mono; only this line. */
+  font-family: var(--font-display);
   color: var(--cabinet-accent);
   font-size: 0.95rem;
   font-weight: 700;
@@ -694,43 +728,154 @@ body {
   text-shadow: 0 0 10px rgba(212, 175, 55, 0.35);
 }
 
-.welcome-screen__btn {
+/* Real click-dispatch target for WelcomeScreen.waitForStart() — see index.html's
+   #welcome-start-btn comment. Never shown; display:none doesn't block .click(). */
+.welcome-screen__start-proxy {
+  display: none;
+}
+
+/* ---------- Engine slider (replaces the old Initialize Engine button) ----------
+   Ported from the sibling Tactile project's identical drag-to-unlock interaction
+   (D:\DEV\Claude\Tactile\css\styles.css, .engine-slider and .gate__shutter rules) —
+   same --metal- family, --cabinet-accent, and --control-border tokens, confirmed
+   matching values in both projects' :root before reusing the gradient stops verbatim. */
+.engine-slider {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
   margin-top: 8px;
-  padding: 14px 34px;
-  border: none;
+}
+
+.engine-slider__track {
+  position: relative;
+  width: 100%;
+  height: 64px;
   border-radius: 999px;
-  cursor: pointer;
-  font-family: "Courier New", monospace;
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  background: linear-gradient(180deg, #101116, #08090c);
+  border: 1px solid var(--control-border);
+  box-shadow:
+    inset 0 3px 10px rgba(0, 0, 0, 0.75),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03),
+    0 12px 30px rgba(0, 0, 0, 0.5);
+  touch-action: none;
+}
+
+.engine-slider__notches {
+  position: absolute;
+  inset: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.engine-slider__notches span {
+  width: 2px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 1px;
+}
+
+.engine-slider__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.05), rgba(212, 175, 55, 0.35));
+  transition: width 0.05s linear;
+}
+
+/* Brushed-metal puck, same technique/tokens as .spin-btn/.powerbet-toggle elsewhere in
+   this cabinet — reads as one family of heavy hardware controls. */
+.engine-slider__thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: grab;
+  background:
+    linear-gradient(160deg, var(--metal-hi) 0%, var(--metal-light) 30%, var(--metal-mid) 55%, var(--metal-dark) 100%);
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.6),
+    inset 0 2px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.35);
+  transition: transform 0.08s ease, left 0.05s linear;
+  will-change: left;
+}
+
+.engine-slider__thumb:active {
+  cursor: grabbing;
+  transform: scale(0.97);
+}
+
+/* Per-notch "gear tooth" resistance tick — toggled for ~90ms per notch crossed during
+   drag by WelcomeScreen.js's setPosition(), alongside a short vibrate(8). */
+.engine-slider__thumb--tick {
+  transform: scale(0.94) rotate(-3deg);
+}
+
+.engine-slider__grip {
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: repeating-linear-gradient(90deg, var(--metal-shadow) 0 2px, var(--metal-dark) 2px 4px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.engine-slider__label {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #241a02;
-  background: radial-gradient(circle at 35% 30%, #f6d97a, var(--cabinet-accent) 60%, #a3821f 100%);
-  animation: welcome-screen-btn-pulse 1.8s ease-in-out infinite;
-  transition: transform 0.06s ease, filter 0.15s ease;
+  color: var(--text-dim);
+  transition: color 0.2s ease;
 }
 
-.welcome-screen__btn:hover {
-  filter: brightness(1.1);
+.engine-slider--armed .engine-slider__label {
+  color: var(--cabinet-accent);
 }
 
-.welcome-screen__btn:active {
-  transform: translateY(2px);
+/* ---------- Camera-shutter unlock sweep ----------
+   Fixed to the viewport (not just the card) so the wipe covers the whole screen
+   regardless of the welcome card's own max-width. Sits as a sibling of
+   .welcome-screen__card, not a descendant — so its own opacity is never multiplied by
+   the card's fade-out, and vice versa; only .welcome-screen--fading (the delayed one
+   above) ever touches the root's opacity, once the sweep below has already finished. */
+.welcome-screen__shutter {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
 }
 
-.welcome-screen__btn:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 4px;
+.welcome-screen__shutter-blade {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  background: #05060a;
+  transition: transform 0.45s cubic-bezier(0.7, 0, 0.3, 1);
 }
 
-@keyframes welcome-screen-btn-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.55), 0 6px 16px rgba(0, 0, 0, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 14px rgba(212, 175, 55, 0), 0 6px 16px rgba(0, 0, 0, 0.4);
-  }
+.welcome-screen__shutter-blade--tl { top: -30vmax; left: -30vmax; transform: translate(-100%, -100%); }
+.welcome-screen__shutter-blade--tr { top: -30vmax; right: -30vmax; transform: translate(100%, -100%); }
+.welcome-screen__shutter-blade--bl { bottom: -30vmax; left: -30vmax; transform: translate(-100%, 100%); }
+.welcome-screen__shutter-blade--br { bottom: -30vmax; right: -30vmax; transform: translate(100%, 100%); }
+
+.welcome-screen--snapping .welcome-screen__shutter-blade {
+  transform: translate(0, 0);
+}
+
+.welcome-screen--snapping .welcome-screen__card {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
 }
 
 /* ---------- Audio profiler (debug overlay) ---------- */
@@ -760,7 +905,7 @@ body {
   border: 1px solid rgba(110, 230, 200, 0.25);
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   pointer-events: none;
   transition: opacity 0.3s ease, filter 0.3s ease;
 }
@@ -888,7 +1033,7 @@ body {
   border: 1px solid rgba(110, 230, 200, 0.35);
   border-radius: 10px;
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.55);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
@@ -1007,7 +1152,7 @@ body {
   border: 1px solid var(--control-border);
   border-radius: 6px;
   color: #d8f5ec;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.62rem;
   padding: 8px;
 }
@@ -1193,7 +1338,7 @@ body {
   background: #000;
   border-radius: 8px;
   border: 1px solid #1c1e24;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   letter-spacing: 0.05em;
   text-align: center;
@@ -1232,7 +1377,7 @@ body {
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1241,7 +1386,10 @@ body {
 
 .win-counter__value {
   display: inline-block;
-  font-family: "Courier New", monospace;
+  /* The small in-cabinet WIN readout — Space Grotesk (see --font-display's rule in
+     :root). Its "WIN" caption (.win-counter__label, above) stays mono — that's still
+     a hardware-panel label, only the number itself is display-scale. */
+  font-family: var(--font-display);
   font-size: 1.7rem;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -1393,7 +1541,7 @@ body {
 }
 
 .big-win-widget__title {
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: clamp(1rem, 3.2vw, 1.3rem);
   font-weight: 800;
   letter-spacing: 0.35em;
@@ -1410,7 +1558,7 @@ body {
 }
 
 .big-win-counter__label {
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   letter-spacing: 0.3em;
   text-transform: uppercase;
@@ -1419,7 +1567,9 @@ body {
 
 .big-win-counter__value {
   display: inline-block;
-  font-family: "Courier New", monospace;
+  /* The one celebratory, brand-scale moment in the cabinet — Space Grotesk, not the
+     mono every other readout uses (see --font-display's rule in :root). */
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: clamp(2.4rem, 9vw, 4rem);
   line-height: 1;
@@ -1435,7 +1585,7 @@ body {
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   font-weight: 800;
   letter-spacing: 0.18em;
@@ -1564,7 +1714,7 @@ body {
 
 .bet-selector__value {
   min-width: 52px;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.02em;

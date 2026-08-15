@@ -38,6 +38,13 @@ const DEFAULT_THEME_MIXES = {
     busWinsSymbol: 0.65,
     busPowerBet: 0.7,
   },
+  neondrive: {
+    busReelsTurbo: 0.75,
+    busWinsSmall: 0.8,
+    busWinsSymbol: 0.9,
+    busReelsNormal: 0.9,
+    busMusic: 0.9,
+  },
 };
 
 // Pure state for the dev mixer: per-theme bus-gain multipliers, keyed exactly as

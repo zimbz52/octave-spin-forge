@@ -7,6 +7,14 @@
        the direct link, not indexed or discoverable otherwise. See robots.txt too. -->
   <meta name="robots" content="noindex, nofollow" />
   <title>Octave Spin Forge — Audio Showcase Prototype</title>
+  <!-- Same JetBrains Mono / Space Grotesk pairing as the sibling Tactile portfolio
+       site (which embeds this engine live) — one shared visual language. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap"
+  />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
@@ -220,9 +228,12 @@
   </div>
 
   <!-- Master audio gate: loads before even the startup terminal (z-index 400 vs the
-       terminal's 300), so the very first thing on screen is one deliberate click that
-       unlocks the shared AudioContext. The terminal underneath is already rendered and
-       wired the instant this is dismissed — nothing else waits on this beyond that. -->
+       terminal's 300), so the very first thing on screen is one deliberate drag-to-
+       unlock gesture that resolves the shared AudioContext. The terminal underneath is
+       already rendered and wired the instant this is dismissed — nothing else waits on
+       this beyond that. A physical, notched engine slider (ported from the sibling
+       Tactile project's identical interaction — see WelcomeScreen.js) replaces the old
+       plain button: the player has to actually drag the thumb home, not just click. -->
   <div class="welcome-screen" id="welcome-screen">
     <div class="welcome-screen__card">
       <p class="welcome-screen__text">Welcome to the Octave Spin Forge!</p>
@@ -232,10 +243,41 @@
       <p class="welcome-screen__text">
         Please use headphones for the optimal mixing and spatial experience.
       </p>
-      <button id="welcome-start-btn" class="welcome-screen__btn" type="button">
-        Initialize Engine
-      </button>
+
+      <div class="engine-slider">
+        <div class="engine-slider__track">
+          <div class="engine-slider__notches" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="engine-slider__fill"></div>
+          <button class="engine-slider__thumb" type="button" aria-label="Drag to initialize sound engine">
+            <span class="engine-slider__grip"></span>
+          </button>
+        </div>
+        <div class="engine-slider__label">INITIALIZE SOUND ENGINE</div>
+      </div>
     </div>
+
+    <div class="welcome-screen__shutter" aria-hidden="true">
+      <div class="welcome-screen__shutter-blade welcome-screen__shutter-blade--tl"></div>
+      <div class="welcome-screen__shutter-blade welcome-screen__shutter-blade--tr"></div>
+      <div class="welcome-screen__shutter-blade welcome-screen__shutter-blade--bl"></div>
+      <div class="welcome-screen__shutter-blade welcome-screen__shutter-blade--br"></div>
+    </div>
+
+    <!-- Real click-dispatch target for WelcomeScreen.waitForStart()'s unchanged
+         listener — the visible button it used to be is now the engine slider above;
+         this stays in the DOM purely so the slider's unlock
+         (WelcomeScreen._snapAndUnlock()) can resolve that Promise with a real click,
+         same as the old button always did. -->
+    <button
+      id="welcome-start-btn"
+      class="welcome-screen__start-proxy"
+      type="button"
+      tabindex="-1"
+      aria-hidden="true"
+    ></button>
   </div>
 
   <!-- Audio profiler: a passive, always-on-top readout of every Howler sound currently

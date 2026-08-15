@@ -6,7 +6,34 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 42
+Read this file first in any new session on this project. It reflects the state after Step 45
+(fixed a real bug the user reported: the drag-to-unlock slider visibly resized right as it reached
+the end. Root cause was a Step 43 CSS comment containing a literal `*/` mid-sentence
+(`--metal-*/--cabinet-accent`), which silently closed the comment early and dropped the entire
+`.engine-slider { width: 100%; display: flex; ... }` rule from the parsed stylesheet — no console
+error, since CSS parse errors are silent. Without it the slider shrank to fit its own label text
+width for its *entire resting state*, not just at unlock; it only became visible as a bug at the
+one moment the label text itself changes (shrinking the already-wrong parent further, live, right
+as the thumb snaps to a position computed pre-shrink). Fix was purely the comment wording — see
+"Engine slider width bug: a self-inflicted CSS comment broke `.engine-slider` entirely (Step 45)"
+below).
+Before that: Step 44
+(the JetBrains Mono + Space Grotesk font pairing ported from the sibling Tactile project — new
+`--font-mono`/`--font-display` tokens, every hardcoded `"Courier New", monospace` routed through
+`--font-mono`, and exactly 4 display-scale/brand selectors — the cabinet wordmark, the welcome
+screen's opening line, the small WIN number, and the jackpot number — opted into `--font-display`.
+Also fixed a pre-existing, previously-invisible bug this surfaced: every `<button>`/`<select>`/
+`<input>` was silently rendering in the browser's default Arial, not the intended mono, for form
+controls not inheriting `font-family` by default — fixed with a global `button, select, input,
+textarea { font-family: inherit; }` reset. See "Font tokens: JetBrains Mono + Space Grotesk, ported
+from Tactile (Step 44)" below).
+Before that: Step 43
+(the welcome screen's plain "Initialize Engine" button replaced with a physical drag-to-unlock
+engine slider — an 8-notch track, a brushed-metal thumb, spring-back on an incomplete drag, and a
+4-blade camera-shutter wipe on success — ported from the sibling Tactile project and adapted to
+this project's `WelcomeScreen.js` lifecycle without changing `waitForStart()`/`dismiss()`'s own
+code. See "Drag-to-unlock engine slider, ported from Tactile (Step 43)" below).
+Before that: Step 42
 (Neon Drive's audio bank refreshed to the current convention — `musicIntense`/`musicBigWin` added,
 a `smallWin01-04`→`winSmall01-04` naming slip fixed at the sync-drive source before copying in,
 and a new `THEME_BPM.neondrive = 80` entry so the adaptive-layer timing quantizes correctly. See
@@ -3089,6 +3116,205 @@ Neon Drive was the last theme with a real audio bank still on the old, pre-Step-
   `themeAudio._bpm === 80` once Neon Drive loads, `musicIntense`/`musicBigWin` both present, a real
   small win played `winSmall04` (confirming the rename took), zero console warnings. A forced Grand
   Win also confirmed `musicBigWin` fires correctly.
+
+**Follow-up, same step:** a finalized `neondrive` entry added to `DevMixer.js`'s
+`DEFAULT_THEME_MIXES` (`busReelsTurbo: 0.75, busWinsSmall: 0.8, busWinsSymbol: 0.9,
+busReelsNormal: 0.9, busMusic: 0.9`) — the user's provided mix-level update also included
+egypt/football/arcade/china/gangster, but those matched the already-baked-in values exactly
+(byte-for-byte), so only the new `neondrive` entry actually changed anything. Verified live via
+`devMixer.getBusVolume("neondrive", <bus>)` for all 5 buses after a proper cache-busted reload
+(an initial check read stale `1` defaults from the already-loaded module — same pattern as this
+file's other stale-cache gotchas, resolved by a fresh navigation); spot-checked the five unchanged
+themes' values too, to confirm the edit didn't disturb anything else.
+
+---
+
+## Drag-to-unlock engine slider, ported from Tactile (Step 43)
+
+The plain "Initialize Engine" button on the welcome screen (the master audio gate — see
+`WelcomeScreen.js`) was replaced with a physical, resistant gear-slider: an 8-notch track the
+player has to drag a brushed-metal thumb across, not just click. Ported from the sibling Tactile
+project (`D:\DEV\Claude\Tactile`, an agency site that embeds this engine live via iframe and
+already built the identical interaction against the same design tokens) and adapted to this
+project's lifecycle rather than reinvented.
+
+**What changed:**
+- `index.html`'s `#welcome-screen` block: the old `<button id="welcome-start-btn"
+  class="welcome-screen__btn">` is gone, replaced by `.engine-slider` (track, 8 notches, fill,
+  brushed-metal thumb with a grip texture) and a `.welcome-screen__shutter` (4 corner blades for
+  the unlock wipe). `#welcome-start-btn` still exists, but repurposed: a `display:none` proxy
+  button, purely a click-dispatch target now (see below).
+- `css/styles.css`: `.welcome-screen__btn*` rules and its pulse keyframes removed; new
+  `.engine-slider*`/`.welcome-screen__shutter*` rules added, reusing this project's own
+  `--metal-hi/light/mid/dark/shadow`, `--cabinet-accent`, and `--control-border` tokens directly
+  (confirmed identical values in both projects' `:root` before copying Tactile's gradient stops
+  verbatim — no parallel palette introduced).
+- `js/theme/WelcomeScreen.js`: gained `_wireEngineSlider()`/`_snapAndUnlock()` (ported from
+  Tactile's `js/main.js` gate-slider IIFE — `thumbTravel()`, `setPosition()`, the pointer/touch
+  handlers, `snapAndUnlock()` — adapted to resolve through this class's existing lifecycle instead
+  of managing reveal/removal itself). **`waitForStart()` and `dismiss()` are both textually
+  unchanged** — the integration deliberately routes through their existing contracts rather than
+  replacing them.
+
+**The two integration problems a naive port would hit, and how they were actually solved:**
+1. **AudioContext unlock timing.** `resume()` only counts as "inside a user gesture" if nothing
+   async sits between the gesture and the call. `_snapAndUnlock()` fires everything synchronously
+   inside the same pointerup/touchend call stack the threshold-crossing drag is already running
+   in: snap the thumb, flip the label, add the shutter class, then `this.startBtnEl.click()` —
+   a real click, synchronously resolving `waitForStart()`'s existing listener. `main.js`'s
+   `await welcomeScreen.waitForStart(); unlockAudioContext();` continuation runs as a microtask
+   directly off that synchronous gesture, preserving activation — exactly like the plain button's
+   click always did. The shutter sweep and `dismiss()`'s fade are purely cosmetic and run
+   afterward, off the gesture entirely.
+2. **Sequencing with the existing fade, without touching `dismiss()`'s code.** Shutter blades are
+   siblings of `.welcome-screen__card` (not nested inside it), so neither's opacity multiplies the
+   other. `.welcome-screen--fading` (added by `dismiss()`, unchanged) got one new line:
+   `transition-delay: 0.48s` — matching the blade sweep's 0.45s duration plus a small buffer — so
+   the root's own opacity fade doesn't even start until the blades have already fully covered the
+   viewport. Net effect: wipe to black (0–450ms), then fade away from black to reveal the terminal
+   underneath (480ms–880ms) — one continuous-feeling sequence, `dismiss()`'s `transitionend`
+   listener still fires exactly once, Promise still resolves exactly once, zero JS changes to make
+   it happen.
+
+**Verification** (scripted `PointerEvent` dispatch driving the exact same code paths real
+touch/mouse input hits, since this session's browser-automation tool's click coordinates don't map
+1:1 to viewport CSS pixels — see "Known environment gotchas" below — plus a real manual drag by
+the user):
+- Partial drag (40% travel) released early → thumb sprang back to `left:4px` (0%), `armed` class
+  removed, zero `Howl.play()` calls — no unlock.
+- Full drag (~99% travel) → label changed to "ENGINE ONLINE", `.welcome-screen--snapping` added,
+  `Howler.ctx.state === "running"` confirmed after, and a real `uiClick` sound actually played
+  (`main.js`'s `systemAudio.play("uiClick")` right after `waitForStart()` resolves) — direct proof
+  the AudioContext unlock landed inside the gesture, not just that the Promise resolved.
+  `#welcome-screen` fully removed from the DOM ~1.5s later, `#startup-terminal` revealed
+  underneath, `dismiss()`'s Promise resolved without hanging.
+- One real bug found and fixed during this verification: `thumb.setPointerCapture(event.pointerId)`
+  (ported as-is from Tactile) threw an uncaught `NotFoundError` when the browser didn't consider
+  the id an active pointer at that instant — a real, if narrow, edge case even with genuine input,
+  not just scripted events. Wrapped in a `try {} catch {}` since capture is a nicety (keeps the
+  drag tracking if the pointer leaves the track bounds), not required for the slider to function —
+  confirmed zero console errors on every subsequent run via a dedicated `window.addEventListener
+  ("error", ...)` listener (more reliable here than this session's `read_console_messages`, which
+  turned out to return accumulated history across navigations, not just the latest page load —
+  briefly misread as the fix not having taken effect before catching that).
+
+New "Known environment gotchas" item: **this session's Browser-automation `computer` tool's
+click/drag `coordinate` (documented as "screenshot-pixel space") does not map 1:1 to real viewport
+CSS pixels** — measured ~1.19x scale factor (a screenshot-space click at `(290,369)` landed a real
+browser event at viewport `(344,439)`) on at least one viewport size this session. A `left_click_drag`
+aimed from a screenshot-estimated thumb position missed the target and dragged a text selection
+instead. Don't burn turns chasing pixel-perfect `computer`-tool coordinates for drag interactions —
+verify the underlying logic via direct scripted `PointerEvent`/`TouchEvent` dispatch instead (drives
+the identical code paths), and ask the user to do a real manual pass for the "does this actually
+feel right" check.
+
+---
+
+## Font tokens: JetBrains Mono + Space Grotesk, ported from Tactile (Step 44)
+
+Brought over the same font pairing/rule the sibling Tactile portfolio site already uses (it embeds
+this engine live, so the two now share one visual language end to end): JetBrains Mono is the base
+for every label/control/readout in this cabinet (reads as physical hardware engraving); Space
+Grotesk is reserved for headline-scale, brand-carrying moments only.
+
+- **New tokens in `:root`** (`css/styles.css`): `--font-mono: "JetBrains Mono", "Courier New",
+  monospace;` and `--font-display: "Space Grotesk", var(--font-mono), sans-serif;` — both chain
+  back to the old hardcoded fallback, so a failed font load still degrades to the exact previous
+  look rather than an unstyled system font.
+- **Fonts loaded** in `index.html`'s `<head>` via the same Google Fonts CSS2 API `<link>` pattern
+  Tactile uses (`preconnect` ×2 + one stylesheet link, `JetBrains+Mono:wght@400;700` +
+  `Space+Grotesk:wght@400;500;700`).
+- **All ~15 literal `"Courier New", monospace` occurrences in `styles.css`** replaced with
+  `font-family: var(--font-mono);` (one occurrence legitimately remains — the `--font-mono` token's
+  own fallback chain, not a hardcoded usage). Every one of these was `font-family: var(--font-mono);`
+  before this step too (a straight swap, not a redesign) — only 4 selectors were deliberately moved
+  to `--font-display` instead: `.cabinet__title` (the "OCTAVE SPIN FORGE" wordmark — previously had
+  no explicit font-family at all, inheriting body's mono; weight bumped 400→700 since a grotesk at
+  the old inherited default reads thin at this size, letter-spacing/color/glow left as-is),
+  `.welcome-screen__text:first-child` (the one human-voiced line on the audio gate), `.win-counter__value`
+  (the small in-cabinet WIN number — its `.win-counter__label` "WIN" caption stays mono), and
+  `.big-win-counter__value` (the jackpot payout number, already weight 800). Every other
+  control/badge/readout — `.big-win-widget__title`, `.big-win-collect-btn`, `.bet-selector__value`,
+  `.powerbet-toggle__label`, `.fast-toggle__label`, `.spin-btn`, the engine slider's own label, etc.
+  — stays mono, deliberately.
+- **A pre-existing, previously-invisible bug found and fixed along the way**: every
+  `<button>`/`<select>`/`<input>` in this app was silently rendering in the browser's default UI
+  font (Arial), not `"Courier New"` — a well-known UA-stylesheet quirk where form controls don't
+  inherit `font-family` from their ancestors by default. This had been true since long before this
+  step (nothing about the mono→token swap introduced it), just undetectable while the "wrong" font
+  and the "right" font were both generic serif-less system fonts that looked similar enough not to
+  notice. It became directly checkable — and directly relevant to this step's own acceptance
+  criteria ("every button, toggle, badge, and label readout is still visibly monospace") — the
+  moment a real, distinctive display font entered the picture and made computed-style spot-checks
+  worth doing. Fixed with a global reset (`button, select, input, textarea { font-family: inherit;
+  }`) right after the `* { box-sizing: border-box; }` rule — the same `font-family: inherit;`
+  pattern already used one-off on `.dev-mixer__export-btn`, now applied everywhere instead of just
+  that one control.
+- **Verified**: `document.fonts.check()` confirmed both families genuinely loaded (not silently
+  falling back) for every weight actually used; computed `font-family` spot-checked across all 4
+  `--font-display` selectors and 9 mono control/label selectors (including the ones the pre-existing
+  bug above affected) — every one matched the intended token post-fix. Zero console errors on a
+  fresh load. Confirmed visually too: the "OCTAVE SPIN FORGE" wordmark and the welcome screen's
+  opening line both render in a clearly distinct grotesk face against the monospace labels
+  surrounding them (READY/WIN/SPIN/FAST SPIN/SUPER BET/THEME, etc.).
+
+---
+
+## Engine slider width bug: a self-inflicted CSS comment broke `.engine-slider` entirely (Step 45)
+
+The user reported a visual bug: right at the moment the drag-to-unlock slider (Step 43) reaches
+the end, "the slider resizes and the slide circle jumps to its locked position but on the resized
+slider." Root cause turned out to be much bigger than the symptom suggested, and dated back to
+Step 43 itself — not a new regression.
+
+**The bug**: Step 43's own doc comment above `.engine-slider` read
+`--metal-*/--cabinet-accent/--control-border tokens` — and `*/` is how a CSS comment ends. The
+comment closed itself early, right in the middle of a sentence, at that `*/`. Everything from
+there — the rest of that sentence, the intended real `*/`, and the entire
+`.engine-slider { width: 100%; display: flex; flex-direction: column; align-items: center; gap:
+14px; margin-top: 8px; }` rule immediately after — got consumed by the browser's CSS parse-error
+recovery and silently dropped. No console error, no visual "something's broken" signal — CSS
+parse errors are silent by design. Confirmed via `document.styleSheets`: the live parsed
+stylesheet's rule list jumped straight from `.welcome-screen__start-proxy` to
+`.engine-slider__track` with no `.engine-slider` rule in between, despite the raw source text
+(fetched with `cache:"no-store"`) clearly containing it.
+
+**Why this produced exactly the reported symptom, and not something more obviously broken**:
+without `.engine-slider`'s `display:flex`/`width:100%`, it fell back to being an ordinary
+block-level flex-item child of `.welcome-screen__card` (still `display:flex`, that rule is
+untouched) with no explicit width — and `.welcome-screen__card` uses `align-items: center`, not
+`stretch`, so a cross-axis-unsized flex item shrinks to fit its own widest in-flow child instead of
+filling the row. That widest child was `.engine-slider__label`'s own text — "INITIALIZE SOUND
+ENGINE" measures ~196px, so the *entire slider* (which also has `.engine-slider__track`'s own,
+separate, still-intact `width: 100%` — now 100% of this shrunk ~196px parent, not the card's full
+~366px) rendered at barely half its intended width for the *whole resting state*, not just at
+unlock. It only became *visible* as a bug at the unlock moment specifically because that's the one
+point `label.textContent` changes to something shorter ("ENGINE ONLINE", ~150px) — shrinking the
+already-wrong shrink-to-fit parent even further, live, at the exact instant the thumb snaps to a
+position computed against the pre-shrink width. Two more-or-less-independently-broken things
+(missing `display:flex`, and a text change happening to coincide with the one moment anyone would
+be staring at the slider closely enough to notice) combined into one specific, narrow-looking
+symptom.
+
+**Fix**: reworded the comment to avoid the literal `*/` substring (`--metal- family, --cabinet-accent,
+and --control-border tokens` instead of `--metal-*/--cabinet-accent/--control-border`) — no code
+logic changed, this was purely a documentation-comment bug. Swept the rest of `styles.css`
+programmatically (a small Node script checking every line for `*/` followed by trailing
+same-line content) for any other instance of this exact failure mode — none found.
+
+**Verified**: `document.styleSheets` rule count went 202 → 203 (the recovered rule), `.engine-slider`
+now computes `display: flex` at the full ~366px card-content width instead of block/~196px, and a
+`requestAnimationFrame`-driven geometry logger spanning the unlock moment confirmed `trackW`/`trackL`
+now stay exactly constant across the label-text switch (previously: 196px → 111px in the same
+window). Visually confirmed too: the slider now correctly spans the full card width at rest, not
+just at unlock — the bug was present the whole time, just least noticeable before the thumb was
+sitting still.
+
+**Lesson for future CSS comments in this file**: a token list or path containing both `*` and `/`
+adjacent to each other (glob-style tokens, wildcard paths, "before/after" prose right next to an
+asterisk) is one keystroke away from silently deleting whatever rule follows it, with zero runtime
+signal that anything went wrong. Worth a second glance before landing a comment shaped like
+`* /` or `x*/y`.
 
 ---
 

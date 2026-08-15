@@ -1,15 +1,31 @@
 // The master audio gate: a full-screen overlay that loads before even the startup
 // terminal, so the very first thing a player can do on this page is the one deliberate
-// click that unlocks audio. Sits above the terminal (z-index 400 vs 300) and simply
-// covers it until dismissed — the terminal underneath is already rendered and wired,
-// this just blocks it from being reachable a moment longer.
+// gesture that unlocks the shared AudioContext. Sits above the terminal (z-index 400 vs
+// 300) and simply covers it until dismissed — the terminal underneath is already
+// rendered and wired, this just blocks it from being reachable a moment longer.
+//
+// The gate is a drag-to-unlock "engine slider" (a heavy, notched thumb the player has
+// to physically pull across, not just click) rather than a plain button — see
+// _wireEngineSlider()/_snapAndUnlock() below, ported from the sibling Tactile project's
+// identical interaction (D:\DEV\Claude\Tactile\js\main.js). It still resolves via a
+// real click on a hidden #welcome-start-btn proxy the instant the drag crosses its
+// unlock threshold, so waitForStart() itself needs no changes at all: the AudioContext
+// unlock in main.js still fires synchronously inside the same user-gesture call stack
+// the pointerup/touchend handler is already running in — see _snapAndUnlock()'s own
+// comment for why that ordering specifically matters here.
+const NOTCH_COUNT = 8;
+const UNLOCK_THRESHOLD = 0.94;
+
 export class WelcomeScreen {
   constructor(rootEl, startBtnEl) {
     this.rootEl = rootEl;
     this.startBtnEl = startBtnEl;
+    this._wireEngineSlider();
   }
 
-  // Resolves once the player clicks (or Enter/Space-activates) the start button.
+  // Resolves once the player clicks (or Enter/Space-activates) the start button — or,
+  // now, once the engine slider's _snapAndUnlock() dispatches a synthetic click on the
+  // hidden proxy button in its place. Unchanged from the plain-button version.
   waitForStart() {
     return new Promise((resolve) => {
       const settle = () => {
@@ -22,7 +38,11 @@ export class WelcomeScreen {
   }
 
   // Fades out over the CSS transition, then permanently removes itself — never comes
-  // back for the rest of the session, same as the terminal.
+  // back for the rest of the session, same as the terminal. Unchanged: the engine
+  // slider's camera-shutter sweep plays first, and this fade's own CSS
+  // (.welcome-screen--fading's transition-delay in styles.css) waits for that sweep to
+  // finish before it even starts, so the two never visibly overlap — no JS-level
+  // sequencing needed here, it's handled entirely by that delay.
   dismiss() {
     return new Promise((resolve) => {
       const onEnd = (event) => {
@@ -34,5 +54,110 @@ export class WelcomeScreen {
       this.rootEl.addEventListener("transitionend", onEnd);
       this.rootEl.classList.add("welcome-screen--fading");
     });
+  }
+
+  // Drag-to-unlock slider: physical resistance (a per-notch tick + haptic), a
+  // spring-back on an incomplete drag, and a camera-shutter wipe on success. Guarded
+  // (no-ops if the markup is missing) rather than throwing — this runs inside init()'s
+  // synchronous path in main.js, same class of single-point-of-failure risk as
+  // wireBetSelector() once was (see ARCHITECTURE.md's "Known environment gotchas" item
+  // 13): a missing element here should degrade, not silently kill the rest of init().
+  _wireEngineSlider() {
+    const slider = this.rootEl.querySelector(".engine-slider");
+    const track = this.rootEl.querySelector(".engine-slider__track");
+    const thumb = this.rootEl.querySelector(".engine-slider__thumb");
+    const fill = this.rootEl.querySelector(".engine-slider__fill");
+    const label = this.rootEl.querySelector(".engine-slider__label");
+    if (!slider || !track || !thumb || !fill || !label) return;
+
+    let dragging = false;
+    let lastNotch = -1;
+    let unlocked = false;
+
+    const thumbTravel = () => track.clientWidth - thumb.offsetWidth - 8; // 4px inset each side
+
+    const setPosition = (px) => {
+      const max = thumbTravel();
+      const clamped = Math.max(0, Math.min(px, max));
+      thumb.style.left = `${clamped + 4}px`;
+      const pct = max === 0 ? 0 : clamped / max;
+      fill.style.width = `${clamped + thumb.offsetWidth}px`;
+
+      const notch = Math.floor(pct * NOTCH_COUNT);
+      if (notch !== lastNotch) {
+        lastNotch = notch;
+        thumb.classList.add("engine-slider__thumb--tick");
+        if (navigator.vibrate) navigator.vibrate(8);
+        setTimeout(() => thumb.classList.remove("engine-slider__thumb--tick"), 90);
+      }
+
+      slider.classList.toggle("engine-slider--armed", pct > 0.15);
+
+      if (pct >= UNLOCK_THRESHOLD && !unlocked) {
+        unlocked = true;
+        this._snapAndUnlock(thumbTravel(), label, setPosition);
+      }
+    };
+
+    const pointerX = (event) => (event.touches ? event.touches[0].clientX : event.clientX);
+
+    const onPointerDown = (event) => {
+      if (unlocked) return;
+      dragging = true;
+      // Can throw NotFoundError if the browser doesn't consider event.pointerId an
+      // active pointer at this exact instant (a real but narrow edge case even with
+      // genuine input, not just synthetic events) — capture is a nicety (keeps the
+      // drag tracking the thumb if the pointer leaves the track), not required for
+      // the slider to work, so a failure here shouldn't be fatal.
+      if (thumb.setPointerCapture && event.pointerId != null) {
+        try {
+          thumb.setPointerCapture(event.pointerId);
+        } catch {
+          /* no-op — see comment above */
+        }
+      }
+      event.preventDefault();
+    };
+
+    const onPointerMove = (event) => {
+      if (!dragging || unlocked) return;
+      const rect = track.getBoundingClientRect();
+      setPosition(pointerX(event) - rect.left - thumb.offsetWidth / 2);
+    };
+
+    const onPointerUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      if (!unlocked) {
+        // Resistant spring-back — the gear didn't fully turn.
+        setPosition(0);
+        lastNotch = -1;
+        slider.classList.remove("engine-slider--armed");
+      }
+    };
+
+    thumb.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    thumb.addEventListener("touchstart", onPointerDown, { passive: false });
+    window.addEventListener("touchmove", onPointerMove, { passive: false });
+    window.addEventListener("touchend", onPointerUp);
+  }
+
+  // Snaps the thumb fully home, fires the shutter-wipe, and dispatches the synthetic
+  // click that resolves waitForStart() — all synchronously, inside the same
+  // pointerup/touchend call stack the drag that just crossed the threshold is already
+  // running in. That synchronicity is what actually matters: main.js does
+  // `await welcomeScreen.waitForStart(); unlockAudioContext();` immediately after, and
+  // resume() only counts as "inside a user gesture" if nothing async — a timer, an
+  // animation's own completion — sits between the gesture and the resolve. The
+  // shutter/dismiss() fade that follows is purely cosmetic and runs on its own clock
+  // afterward (see styles.css's .welcome-screen--fading transition-delay).
+  _snapAndUnlock(travel, label, setPosition) {
+    setPosition(travel);
+    label.textContent = "ENGINE ONLINE";
+    this.rootEl.classList.add("welcome-screen--snapping");
+    if (navigator.vibrate) navigator.vibrate([15, 30, 40]);
+    this.startBtnEl.click();
   }
 }
