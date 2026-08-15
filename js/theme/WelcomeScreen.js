@@ -1,3 +1,6 @@
+import { unlockAudioContext } from "../audio/audioUtils.js";
+import { playSliderEngage, playSliderTick, playSliderCancel, playSliderLock, playSliderReveal } from "../audio/audioHooks.js";
+
 // The master audio gate: a full-screen overlay that loads before even the startup
 // terminal, so the very first thing a player can do on this page is the one deliberate
 // gesture that unlocks the shared AudioContext. Sits above the terminal (z-index 400 vs
@@ -7,12 +10,24 @@
 // The gate is a drag-to-unlock "engine slider" (a heavy, notched thumb the player has
 // to physically pull across, not just click) rather than a plain button — see
 // _wireEngineSlider()/_snapAndUnlock() below, ported from the sibling Tactile project's
-// identical interaction (D:\DEV\Claude\Tactile\js\main.js). It still resolves via a
-// real click on a hidden #welcome-start-btn proxy the instant the drag crosses its
-// unlock threshold, so waitForStart() itself needs no changes at all: the AudioContext
-// unlock in main.js still fires synchronously inside the same user-gesture call stack
-// the pointerup/touchend handler is already running in — see _snapAndUnlock()'s own
-// comment for why that ordering specifically matters here.
+// identical interaction (D:\DEV\Claude\Tactile\js\main.js).
+//
+// Audio unlock timing, Step 46: unlockAudioContext() is called from the very first
+// pointerdown/touchstart on the thumb — the instant the player grabs it — not once the
+// drag succeeds. Browsers only require *one* trusted gesture to unlock audio, and
+// grabbing the thumb is as legitimate a gesture as the click that used to do it, so
+// there's no reason to make the whole drag silent while waiting for it to finish. This
+// is what lets every notch tick/cancel/lock sound below actually play live, in real
+// time, instead of only the final reveal being audible. main.js's own
+// `await welcomeScreen.waitForStart(); unlockAudioContext();` call is now a redundant
+// (harmless — see unlockAudioContext()'s own "safe any number of times" contract)
+// safety net for the case _wireEngineSlider() guards out below (missing markup) and
+// this whole class never gets a chance to unlock anything itself.
+//
+// waitForStart() itself is untouched: it still resolves via a real click on a hidden
+// #welcome-start-btn proxy the instant the drag crosses its unlock threshold — that's
+// just the existing "move on to the next screen" signal now, unrelated to the audio
+// unlock, which already happened earlier.
 const NOTCH_COUNT = 8;
 const UNLOCK_THRESHOLD = 0.94;
 
@@ -87,6 +102,7 @@ export class WelcomeScreen {
       if (notch !== lastNotch) {
         lastNotch = notch;
         thumb.classList.add("engine-slider__thumb--tick");
+        playSliderTick(notch / NOTCH_COUNT);
         if (navigator.vibrate) navigator.vibrate(8);
         setTimeout(() => thumb.classList.remove("engine-slider__thumb--tick"), 90);
       }
@@ -104,6 +120,12 @@ export class WelcomeScreen {
     const onPointerDown = (event) => {
       if (unlocked) return;
       dragging = true;
+      // The actual audio unlock — see the class-level comment above for why this
+      // fires here, on grab, rather than waiting for the drag to succeed. Every
+      // fresh grab re-fires this (e.g. after a spring-back), not just the first —
+      // unlockAudioContext() is a safe no-op once already running.
+      unlockAudioContext();
+      playSliderEngage();
       // Can throw NotFoundError if the browser doesn't consider event.pointerId an
       // active pointer at this exact instant (a real but narrow edge case even with
       // genuine input, not just synthetic events) — capture is a nicety (keeps the
@@ -129,7 +151,11 @@ export class WelcomeScreen {
       if (!dragging) return;
       dragging = false;
       if (!unlocked) {
-        // Resistant spring-back — the gear didn't fully turn.
+        // Resistant spring-back — the gear didn't fully turn. setPosition(0) below
+        // still fires its own notch tick as the thumb crosses back through 0 (not
+        // suppressed) — layered with the cancel cue, it reads as the gear unwinding
+        // back through its teeth, not just a flat "nope."
+        playSliderCancel();
         setPosition(0);
         lastNotch = -1;
         slider.classList.remove("engine-slider--armed");
@@ -144,19 +170,21 @@ export class WelcomeScreen {
     window.addEventListener("touchend", onPointerUp);
   }
 
-  // Snaps the thumb fully home, fires the shutter-wipe, and dispatches the synthetic
-  // click that resolves waitForStart() — all synchronously, inside the same
-  // pointerup/touchend call stack the drag that just crossed the threshold is already
-  // running in. That synchronicity is what actually matters: main.js does
-  // `await welcomeScreen.waitForStart(); unlockAudioContext();` immediately after, and
-  // resume() only counts as "inside a user gesture" if nothing async — a timer, an
-  // animation's own completion — sits between the gesture and the resolve. The
-  // shutter/dismiss() fade that follows is purely cosmetic and runs on its own clock
-  // afterward (see styles.css's .welcome-screen--fading transition-delay).
+  // Snaps the thumb fully home, fires the lock/reveal sounds and the shutter-wipe, and
+  // dispatches the synthetic click that resolves waitForStart() — all synchronously,
+  // inside the same pointerup/touchend call stack the drag that just crossed the
+  // threshold is already running in. Audio was already unlocked back on the initial
+  // grab (see the class-level comment and onPointerDown above), so nothing here is
+  // load-bearing for that anymore — kept synchronous anyway as a matter of not
+  // introducing a delay for no reason. The shutter/dismiss() fade that follows is
+  // purely cosmetic and runs on its own clock afterward (see styles.css's
+  // .welcome-screen--fading transition-delay).
   _snapAndUnlock(travel, label, setPosition) {
     setPosition(travel);
     label.textContent = "ENGINE ONLINE";
     this.rootEl.classList.add("welcome-screen--snapping");
+    playSliderLock();
+    playSliderReveal();
     if (navigator.vibrate) navigator.vibrate([15, 30, 40]);
     this.startBtnEl.click();
   }

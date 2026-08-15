@@ -1,6 +1,8 @@
-// Stub hooks marking where the audio engine will plug into the spin lifecycle.
-// Left as console.log placeholders until Howler wiring lands for each — except the
-// ones now wired to real system/theme sounds.
+// Stub hooks marking where the audio engine plugs into the spin lifecycle — plus the
+// welcome screen's engine slider (Step 46), the one thing that fires before any game
+// state exists. Left as console.log placeholders until Howler wiring lands for each —
+// except the ones now wired to real system/theme sounds. Single source of truth for
+// "what's actually implemented vs. still a stub" — check here first in any new session.
 import { systemAudio } from "./SystemAudio.js";
 import { themeAudio } from "./ThemeAudio.js";
 
@@ -215,4 +217,49 @@ export function playPowerBetOff() {
 export function playBetClick(direction) {
   console.log(`[audio hook] playBetClick(direction="${direction}")`);
   systemAudio.playBetClick(direction);
+}
+
+// --- Welcome-screen engine slider (Step 46) ---
+// The drag-to-unlock gate's own tactile feedback — see WelcomeScreen.js's
+// _wireEngineSlider()/_snapAndUnlock(). Imported there directly (not through
+// GameController) since these fire before any game state exists — the gate is its own
+// short lifecycle, not a spin event.
+
+// Fires the instant the player first grabs the thumb — the same call site
+// WelcomeScreen.js calls unlockAudioContext() from, so this is the earliest sound the
+// page is capable of playing (see WelcomeScreen.js for why the unlock moved here).
+export function playSliderEngage() {
+  console.log("[audio hook] playSliderEngage()");
+  systemAudio.play("uiMenuOn");
+}
+
+// Fires once per gear notch crossed during the drag. progress: 0-1, how far through
+// the drag this notch sits — see SystemAudio.playSliderTick() for the pitch climb.
+export function playSliderTick(progress) {
+  console.log(`[audio hook] playSliderTick(progress=${progress.toFixed(2)})`);
+  systemAudio.playSliderTick(progress);
+}
+
+// Fires when a drag is released before the unlock threshold and the thumb springs
+// back to 0 — the audio side of "the gear didn't fully turn."
+export function playSliderCancel() {
+  console.log("[audio hook] playSliderCancel()");
+  systemAudio.play("uiMenuOff");
+}
+
+// Fires the instant the drag crosses the unlock threshold — the heavy mechanical
+// "locks home" moment, meant to be the single most weighty sound in this sequence.
+// The systemSounds sprite sheet doesn't have a dedicated sound for this yet — left as
+// a placeholder (no systemAudio.play call) until one exists, same shape as
+// playTransitionWhoosh() above.
+export function playSliderLock() {
+  console.log("[audio hook] playSliderLock()");
+}
+
+// Fires alongside the camera-shutter sweep that follows a successful unlock — reuses
+// the same "uiTransition" cue as a real theme reveal (playTransitionOutro() above), so
+// every "screen wipes to reveal something new" moment in the app shares one motif.
+export function playSliderReveal() {
+  console.log("[audio hook] playSliderReveal()");
+  systemAudio.play("uiTransition");
 }

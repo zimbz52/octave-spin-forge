@@ -344,18 +344,21 @@ async function init() {
   wireGlobalUISfx(startupTerminal.listEl);
 
   // Master audio gate: loads visually on top of the terminal (already rendered and
-  // wired above) and blocks it until this one deliberate click. That click is the
-  // page's actual first user gesture — explicitly resuming the AudioContext here
-  // rather than just relying on Howler's own automatic first-gesture unlock means
-  // every hover/click sfx on the terminal underneath is guaranteed audible the
-  // instant it's reachable, not just "probably fine by then."
+  // wired above) and blocks it until the player drags its engine slider home. The
+  // page's actual first user gesture is now the initial *grab* of that slider, not
+  // this resolve — WelcomeScreen unlocks the AudioContext itself, from the thumb's own
+  // pointerdown/touchstart, well before waitForStart() resolves (see WelcomeScreen.js's
+  // class-level comment, Step 46). This call is a harmless, idempotent safety net for
+  // the one case that path doesn't fire: _wireEngineSlider() guarding out on missing
+  // markup. No systemAudio.play() here anymore either — the slider fires its own
+  // lock/reveal sounds on unlock (playSliderLock()/playSliderReveal()); a generic
+  // uiClick layered on top of those would just be clutter.
   const welcomeScreen = new WelcomeScreen(
     document.getElementById("welcome-screen"),
     document.getElementById("welcome-start-btn")
   );
   await welcomeScreen.waitForStart();
   unlockAudioContext();
-  systemAudio.play("uiClick");
   await welcomeScreen.dismiss();
 
   const chosenThemeId = await startupTerminal.waitForSelection();

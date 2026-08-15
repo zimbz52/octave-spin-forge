@@ -21,6 +21,13 @@ const BET_CLICK_RATE_STEP = 0.05;
 const BET_CLICK_RATE_MAX = 1.5;
 const BET_CLICK_RATE_MIN = 0.5;
 
+// Engine-slider notch tick (welcome screen): rate climbs with drag *progress* (0 at
+// the first notch, 1 at the last), not click speed like BET_CLICK_* above — the tick
+// should audibly brighten as the thumb nears the unlock threshold regardless of how
+// fast the player drags, a deliberate rising-tension arc rather than a speed effect.
+const SLIDER_TICK_RATE_MIN = 0.9;
+const SLIDER_TICK_RATE_MAX = 1.15;
+
 // The whole system UI bank plays a bit hot relative to the theme/SFX layers — pulled
 // down a flat -3dB so clicks/hovers sit back in the mix instead of poking out front.
 const SYSTEM_VOLUME_DB = -3;
@@ -164,6 +171,18 @@ class SystemAudio {
 
     const id = this.howl.play("uiBet");
     this.howl.rate(this._betClickRate, id);
+  }
+
+  // Engine-slider notch tick (welcome screen): plays uiSlider with a rate that climbs
+  // with drag progress — see SLIDER_TICK_* above. progress: 0-1. Deliberately calls
+  // this.howl.play() directly, not the play() wrapper — controlled by progress, not
+  // random jitter.
+  playSliderTick(progress) {
+    if (!this.ready || !this.howl || !this._spriteNames.has("uiSlider")) return;
+    const clamped = Math.max(0, Math.min(1, progress));
+    const rate = SLIDER_TICK_RATE_MIN + clamped * (SLIDER_TICK_RATE_MAX - SLIDER_TICK_RATE_MIN);
+    const id = this.howl.play("uiSlider");
+    this.howl.rate(rate, id);
   }
 }
 

@@ -6,7 +6,18 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 45
+Read this file first in any new session on this project. It reflects the state after Step 46
+(tactile audio for the engine slider, designed as a brainstorm with the user first — the key move
+was relocating `unlockAudioContext()` from `waitForStart()` resolving to the thumb's own first
+`pointerdown`/`touchstart`, so the drag itself can make sound instead of only the final reveal.
+Five new `audioHooks.js` hooks wired into `WelcomeScreen.js`: `playSliderEngage()` (grab),
+`playSliderTick(progress)` (per-notch, pitch climbs 0.9→1.15 with drag position via a new
+`SystemAudio.playSliderTick()`), `playSliderCancel()` (spring-back), `playSliderLock()` (still a
+placeholder — no sprite yet), `playSliderReveal()` (reuses `uiTransition`, the same cue a real
+theme reveal uses). All three real sounds came from `uiMenuOn`/`uiMenuOff`/`uiSlider` — unused
+since Step 25, sitting in the bank the whole time. See "Tactile audio for the engine slider, and
+moving the AudioContext unlock to first grab (Step 46)" below).
+Before that: Step 45
 (fixed a real bug the user reported: the drag-to-unlock slider visibly resized right as it reached
 the end. Root cause was a Step 43 CSS comment containing a literal `*/` mid-sentence
 (`--metal-*/--cabinet-accent`), which silently closed the comment early and dropped the entire
@@ -3315,6 +3326,61 @@ adjacent to each other (glob-style tokens, wildcard paths, "before/after" prose 
 asterisk) is one keystroke away from silently deleting whatever rule follows it, with zero runtime
 signal that anything went wrong. Worth a second glance before landing a comment shaped like
 `* /` or `x*/y`.
+
+---
+
+## Tactile audio for the engine slider, and moving the AudioContext unlock to first grab (Step 46)
+
+Designed with the user as a brainstorm first: what should the drag-to-unlock slider (Step 43)
+actually *sound* like to be "very tactile"? The key fork was architectural, not sonic — **the
+whole drag was silent up to this point**, since `unlockAudioContext()` only ever fired after
+`waitForStart()` resolved (i.e., after a *successful* drag), so nothing could play mid-drag no
+matter what hooks got added. Resolved by moving the unlock earlier.
+
+- **`unlockAudioContext()` now fires from the thumb's own `pointerdown`/`touchstart`** — the
+  instant the player grabs it — not once the drag succeeds. Browsers only require *one* trusted
+  gesture to unlock audio; grabbing the thumb qualifies exactly as well as the click that used to
+  do it. `main.js`'s own `await welcomeScreen.waitForStart(); unlockAudioContext();` call is now a
+  harmless, idempotent safety net for the one case `_wireEngineSlider()` guards out (missing
+  markup) — see `unlockAudioContext()`'s own "safe any number of times" contract in
+  `audioUtils.js`. `waitForStart()`/`dismiss()` themselves are still untouched — resolving on a
+  drag success is now purely a "move to the next screen" signal, unrelated to the (already-done)
+  audio unlock.
+- **Five new hooks added to `audioHooks.js`** (the established "single source of truth for what's
+  wired vs. placeholder" file — its scope note updated to cover the welcome gate too, not just the
+  spin lifecycle), imported directly into `WelcomeScreen.js` rather than through `GameController`,
+  since the gate is its own short lifecycle before any game state exists:
+  - `playSliderEngage()` → `uiMenuOn` — fires on every grab (including retries after a
+    spring-back), not just the first.
+  - `playSliderTick(progress)` → new `SystemAudio.playSliderTick()`, plays `uiSlider` with a
+    **controlled, progress-driven pitch climb** (0.9 at the first notch → 1.15 at the last,
+    `SLIDER_TICK_RATE_MIN/MAX`) — deliberately tied to drag *position*, not speed, unlike
+    `playBetClick()`'s speed-based bend, so the climb toward unlock is a consistent rising-tension
+    arc regardless of how fast the player drags. `uiSlider` had been sitting in the sprite sheet
+    unused since Step 25 — reserved for exactly this, per its name.
+  - `playSliderCancel()` → `uiMenuOff` — fires on an incomplete-drag spring-back. Deliberately
+    layered with `setPosition(0)`'s own notch-tick as the thumb crosses back through 0 (not
+    suppressed) — reads as the gear audibly unwinding through its teeth, not a flat "nope."
+  - `playSliderLock()` — the heavy "locks home" moment, meant to be the single most weighty sound
+    in the sequence. **Still a placeholder** (no matching sprite exists yet) — same shape as
+    `playTransitionWhoosh()`.
+  - `playSliderReveal()` → `uiTransition` — reuses the exact same cue a real theme-select reveal
+    uses (`playTransitionOutro()`), so every "screen wipes to reveal something new" moment in the
+    app shares one consistent motif rather than each getting its own bespoke whoosh.
+- `uiMenuOn`/`uiMenuOff`, like `uiSlider`, had also been sitting unused since Step 25 — all three
+  of this step's real (non-placeholder) sounds came from the existing bank, zero new sprites
+  needed.
+
+**Verified** with a `Howl.play`/`Howl.rate` spy across three scenarios: (1) a bare grab — confirmed
+`Howler.ctx.state === "running"` immediately after `pointerdown`, before any drag movement at all;
+(2) a partial drag released early — engage → 3 climbing-pitch ticks (`0.9`/`0.9625`/`0.99375`) →
+cancel → one more tick reset back to `0.9` as it springs through 0; (3) a full successful drag —
+engage → ticks climbing all the way to `1.0` → `playSliderLock()` (logged, no sprite) →
+`playSliderReveal()` (`uiTransition`), with the welcome screen still cleanly dismissing and the
+terminal revealing underneath exactly as before. Zero console errors beyond the same
+`navigator.vibrate` "not a trusted tap" block scripted/synthetic events always produce in this
+environment — see the Tactile-slider verification notes above; not a real issue, doesn't reproduce
+with genuine input.
 
 ---
 
