@@ -361,6 +361,14 @@ async function init() {
   unlockAudioContext();
   await welcomeScreen.dismiss();
 
+  // Menu ambience: Vintage Arcade's gameAmbLP/gameStart (not its music) play as a
+  // generic "lobby" atmosphere while the player is still choosing a theme below —
+  // deliberately not awaited, so a fast selection isn't blocked on this load.
+  // loadTheme()'s own in-flight-token guard already discards this cleanly if the
+  // player picks before it resolves; if they pick Arcade itself, loadTheme()'s
+  // "already loaded" branch starts its music on top instead of reloading the bank.
+  themeAudio.loadTheme("arcade", { skipMusic: true });
+
   const chosenThemeId = await startupTerminal.waitForSelection();
   themeSelect.value = chosenThemeId;
   await themeTransition.enterFromTerminal(chosenThemeId, startupTerminal);

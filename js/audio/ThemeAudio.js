@@ -133,8 +133,18 @@ class ThemeAudio {
   // one loads, and a superseded in-flight load (rapid theme switching) is discarded
   // when it resolves — so the game can never end up with two overlapping instances,
   // music loops, or voice beds.
-  async loadTheme(themeName) {
-    if (this.currentTheme === themeName && this.ready) return;
+  //
+  // skipMusic: starts gameAmbLP/gameStart but not musicMain/musicIntense — used by the
+  // startup terminal's menu ambience (see main.js's init()), which previews a theme's
+  // atmosphere without committing to its music track before the player has actually
+  // chosen anything. If the player then picks that exact theme for real, the
+  // already-loaded branch below starts the music it held back rather than reloading
+  // the whole bank from scratch.
+  async loadTheme(themeName, { skipMusic = false } = {}) {
+    if (this.currentTheme === themeName && this.ready) {
+      if (!skipMusic) this._startThemeIntro(false);
+      return;
+    }
 
     const token = ++this._loadToken;
     this._teardown();
@@ -181,7 +191,7 @@ class ThemeAudio {
           this.howl = howl;
           this._spriteNames = spriteNames;
           this.ready = true;
-          this._startThemeIntro();
+          this._startThemeIntro(skipMusic);
           resolve();
         },
         onloaderror: (id, err) => {
@@ -227,13 +237,14 @@ class ThemeAudio {
 
   // gameAmbLP (the ambient SFX bed), gameStart (if the bank has one), and musicMain
   // all start together — musicMain no longer waits for gameStart to finish before
-  // entering; it fades in underneath it instead (see _playMusicLoop()).
-  _startThemeIntro() {
+  // entering; it fades in underneath it instead (see _playMusicLoop()). skipMusic:
+  // see loadTheme()'s own comment — used by the startup terminal's menu ambience.
+  _startThemeIntro(skipMusic = false) {
     this._playAmbientLoop();
     if (this._spriteNames.has("gameStart")) {
       this._play("gameStart");
     }
-    this._playMusicLoop();
+    if (!skipMusic) this._playMusicLoop();
   }
 
   // SFX layer, not music — deliberately never touched by setMusicVolume(). Only

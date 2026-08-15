@@ -6,7 +6,15 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 46
+Read this file first in any new session on this project. It reflects the state after Step 47
+(Vintage Arcade's `gameAmbLP`/`gameStart` now play as generic menu ambience while the player is
+still choosing a theme in the startup terminal — not its music, deliberately. New `skipMusic`
+option on `ThemeAudio.loadTheme()`, fired unawaited right after the welcome screen dismisses.
+Picking a different theme tears it down exactly like any theme switch always has; picking Arcade
+itself continues the same already-playing ambient loop rather than restarting it, with music
+layering on top. See "Startup terminal menu ambience: Vintage Arcade's gameAmbLP/gameStart
+(Step 47)" below).
+Before that: Step 46
 (tactile audio for the engine slider, designed as a brainstorm with the user first — the key move
 was relocating `unlockAudioContext()` from `waitForStart()` resolving to the thumb's own first
 `pointerdown`/`touchstart`, so the drag itself can make sound instead of only the final reveal.
@@ -3381,6 +3389,44 @@ terminal revealing underneath exactly as before. Zero console errors beyond the 
 `navigator.vibrate` "not a trusted tap" block scripted/synthetic events always produce in this
 environment — see the Tactile-slider verification notes above; not a real issue, doesn't reproduce
 with genuine input.
+
+---
+
+## Startup terminal menu ambience: Vintage Arcade's gameAmbLP/gameStart (Step 47)
+
+The theme-selection menu (startup terminal) had been fully silent since it was built — deliberate,
+per its own "AUDIO LOCKED UNTIL SELECTION" copy. The user asked to add Vintage Arcade's
+`gameAmbLP`/`gameStart` (its ambient bed + one-shot start stinger) as a generic "lobby" atmosphere
+while the player is still choosing, explicitly *not* its music — a menu shouldn't commit to one
+theme's music track before the player has picked anything.
+
+- **New `skipMusic` option on `ThemeAudio.loadTheme(themeName, { skipMusic })`**: starts
+  `gameAmbLP`/`gameStart` but withholds `musicMain`/`musicIntense`. `main.js`'s `init()` calls
+  `themeAudio.loadTheme("arcade", { skipMusic: true })` right after the welcome screen dismisses —
+  deliberately **not awaited**, so a fast theme pick isn't blocked on this load; `loadTheme()`'s
+  existing in-flight-load-token guard (already there for rapid theme switching) discards it
+  cleanly for free if the player selects before it resolves.
+- **The "pick Arcade itself while its ambience is already playing" edge case**, handled without a
+  redundant reload: `loadTheme()`'s existing "already loaded" early-return
+  (`this.currentTheme === themeName && this.ready`) used to just no-op. It now checks `skipMusic`
+  too — if the caller this time *isn't* skipping music, it calls `_startThemeIntro(false)` on the
+  bank that's already loaded and playing, instead of silently doing nothing (the old behavior,
+  which would have left Arcade's menu ambience running forever with no music once actually
+  selected) or reloading the whole bank from scratch (the naive fix, wasteful and would restart the
+  already-playing ambient loop audibly).
+- **Picking any other theme** needs no special handling — `loadTheme()`'s existing
+  teardown-before-load sequence (`this._teardown()`, unconditional, always runs first for a
+  genuinely different theme) already stops Arcade's ambience cleanly before the chosen theme's own
+  bank loads, exactly like every theme switch always has.
+
+**Verified** with a `Howl.play` spy across three scenarios: (1) menu ambience alone — confirmed
+`gameAmbLP`/`gameStart` play while the terminal is still up, `musicMain`/`musicIntense` do not;
+(2) picking a different theme (Egypt) — Arcade's Howl instance torn down, Egypt's own full intro
+(ambient + start + both music layers) starts clean, terminal dismisses; (3) picking Arcade itself
+— confirmed via `ambientId` staying numerically identical before and after selection (no restart,
+no gap) that the *same* already-playing ambient loop just continues, with music layering in on top
+a beat later. Zero unexpected console errors (only the same synthetic-event `navigator.vibrate`
+artifact noted in every other Step's verification this session).
 
 ---
 
