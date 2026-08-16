@@ -4,11 +4,11 @@
 // Each `id` must match its `themes/<id>.json` and `src/audio/<id>Sounds.json` file names,
 // and have a matching entry in ThemeTransition.js's THEME_BACKDROPS.
 export const THEMES = [
-  { id: "egypt", label: "Egypt" },
-  { id: "mexico", label: "Mexico" },
-  { id: "arcade", label: "Vintage Arcade" },
-  { id: "football", label: "Football" },
-  { id: "china", label: "China" },
+  { id: "egypt", label: "Desert Mysteries" },
+  { id: "mexico", label: "Caramba!" },
+  { id: "arcade", label: "Arcade Zap" },
+  { id: "football", label: "Mondial Dream" },
+  { id: "china", label: "Jade Empire" },
   { id: "neondrive", label: "Neon Drive" },
-  { id: "gangster", label: "Gangster" },
+  { id: "gangster", label: "Bourbon Blues" },
 ];

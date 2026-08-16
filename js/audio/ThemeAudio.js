@@ -416,17 +416,40 @@ class ThemeAudio {
 
   // --- Reel mechanics ---
 
+  // Returns the Howl playback id (or null if the bank has no reelStart sprite) so a
+  // caller can explicitly stop this instance later — see audioHooks.js's turbo-mode
+  // reel-start cutoff, the only current use of the returned id.
   playReelStart() {
     const name = this._randomAvailableIndexedName("reelStart");
-    if (name) this._play(name);
+    if (!name) return null;
+    return this._play(name);
   }
 
-  playReelStop() {
+  // Cuts off a still-playing reelStart instance precisely on cue — hard stop, no
+  // fade, same "stop exactly on the beat" convention as stopBigWinRiser()/
+  // stopSmallWinDigits() below, not a fade-out.
+  stopReelStart(id) {
+    if (!this.ready || !this.howl || id == null) return;
+    this.howl.stop(id);
+  }
+
+  // pitchSemitones: optional pitch shift (e.g. -3, +2) applied on top of the sprite's
+  // own recorded pitch, via Howler's playback-rate control — used by turbo mode to
+  // spread its 3 simultaneous reelStop drops into a small chord instead of one flat,
+  // phasey unison hit (see audioHooks.js's TURBO_REEL_STOP_SEMITONES).
+  playReelStop(pitchSemitones = 0) {
     const name = this._randomAvailableIndexedName("reelStop");
-    if (name) this._play(name);
+    if (!name) return;
+    const id = this._play(name);
+    if (pitchSemitones && id !== null) {
+      this.howl.rate(Math.pow(2, pitchSemitones / 12), id);
+    }
   }
 
-  // Fast mode replaces the standard start/stop sequence with a single turbo cue.
+  // Muted (Step 51): turbo mode now reuses the normal reel-start cue instead of this
+  // dedicated one — see audioHooks.js's playReelStart(). Left defined/unused rather
+  // than removed, same "leave the sprite and its plumbing alone, just stop calling it"
+  // treatment as other muted-but-intact hooks in this file.
   playReelTurbo() {
     const name = this._randomAvailableIndexedName("reelTurbo");
     if (name) this._play(name);

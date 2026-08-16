@@ -6,7 +6,14 @@ intentionally simple/placeholder (CSS-shape symbols, CSS-gradient backdrops) —
 architecture is the actual product. Vanilla JS ES modules, no build step, no framework, no
 dependencies besides Howler (loaded via CDN `<script>` in `index.html`).
 
-Read this file first in any new session on this project. It reflects the state after Step 50
+Read this file first in any new session on this project. It reflects the state after Step 51
+(turbo mode's reel audio reworked: the 3 reelStop drops — previously suppressed entirely in
+turbo — now play together, spread across a fixed pitch offset (-3/+2 semitones on 2 of the 3)
+so the unison lands as a small chord instead of a flat phasey hit. reelTurbo is muted; turbo
+mode now reuses the theme's normal reelStart cue instead, explicitly stopped the instant the
+reelStop drops land since reelStart isn't authored to fit turbo's shorter spin. See "Turbo mode
+reel audio: reelStop x3 with a pitch spread, reelStart replacing reelTurbo (Step 51)" below).
+Before that: Step 50
 (the welcome card's Start-button state and slider state now share a single fixed-height
 `.welcome-screen__stage` wrapper, so the card no longer visibly resizes/jumps when Start is
 tapped and the slider takes its place — and the button now sits at the exact vertical position
@@ -3592,6 +3599,40 @@ Start: card height identical in both states (322.3125px, zero delta), and the bu
 center (532.16px) exactly matches the slider's vertical center (532.16px) once revealed. Confirmed
 visually with a screenshot as well. No regressions — slider drag, `waitForStart()`/`dismiss()`,
 and the rest of the flow all unaffected, since only layout/wrapper markup changed.
+
+---
+
+## Turbo mode reel audio: reelStop x3 with a pitch spread, reelStart replacing reelTurbo (Step 51)
+
+Turbo mode's reel audio had two long-standing placeholders: `playReelStop()` was suppressed
+entirely while `isFastMode` was true (GameController quantizes all 3 reels onto the same
+16th-note grid instant, so 3 simultaneous reelStop samples would've read as one flat, phasey
+hit — see the removed comment on the old `playReelStop()`), and turbo used a dedicated
+`reelTurbo` cue in place of the normal `reelStart` sound entirely.
+
+**Fix**:
+- **reelStop x3, pitch-spread**: `playReelStop()` now plays in turbo mode too. `ThemeAudio.
+  playReelStop(pitchSemitones)` takes an optional semitone offset applied via Howler's
+  `rate()` (`2 ** (semitones / 12)`); `audioHooks.js`'s `TURBO_REEL_STOP_SEMITONES = { 0: -3,
+  1: 0, 2: 2 }` maps reel position to offset deterministically (not random), so the same
+  unison always resolves to the same small chord rather than a coin-flip.
+- **reelTurbo muted**: `ThemeAudio.playReelTurbo()` is left defined but no longer called from
+  anywhere — same "leave the sprite and its plumbing alone, just stop calling it" treatment as
+  other unused-but-intact hooks in this file (e.g. `playSliderLock`).
+- **reelStart takes over, stopped precisely on the drop**: turbo mode's `playReelStart()` now
+  calls `themeAudio.playReelStart()` (same sound normal mode uses) instead of `playReelTurbo()`.
+  `ThemeAudio.playReelStart()` now returns its Howl id; `audioHooks.js` keeps it in
+  module-level `turboReelStartId` and hard-stops it (new `ThemeAudio.stopReelStart(id)`, same
+  no-fade "stop exactly on cue" convention as `stopBigWinRiser()`/`stopSmallWinDigits()`) the
+  instant the first `playReelStop()` call lands in turbo mode — since turbo's stagger is 0, all
+  3 reels' `onImpact` calls land at effectively the same instant, so this fires once for real
+  and no-ops (id already null) for the other two.
+
+**Verified**: sampled `Howler._howls`/`_sounds` live during an actual turbo spin.
+`reelStart03` (rate 1) played at spin start; the instant the reel-stops landed it vanished from
+the active-sounds list and 3 `reelStop` sounds appeared simultaneously at rates `0.8409`
+(`2^(-3/12)`, reel 0), `1.0` (reel 1), and `1.1225` (`2^(2/12)`, reel 2) — exact match for the
+intended offsets. `reelTurbo` never appeared anywhere in the trace. Zero console errors.
 
 ---
 

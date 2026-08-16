@@ -25,30 +25,56 @@ export function playTransitionOutro() {
   systemAudio.play("uiTransition");
 }
 
-// isFastMode: turbo mode replaces the standard reel start/stop sound sequence with a
-// single turbo cue, so this only plays the theme's slow reel-start when it's off.
+// Turbo mode's own in-flight reelStart id (Step 51) — kept here, not on themeAudio,
+// since it's specifically the "cut this off the instant the reel-stops land" contract
+// between playReelStart() and playReelStop() below, not a piece of theme playback
+// state. null whenever there's nothing turbo-mode-started currently playing.
+let turboReelStartId = null;
+
+// isFastMode: turbo mode (Step 51) now reuses the theme's normal, slower reel-start
+// cue instead of the dedicated reelTurbo one — reelTurbo is muted (still defined in
+// ThemeAudio.js, just no longer called). reelStart isn't authored to fit turbo's much
+// shorter spin duration, so its id is kept and explicitly stopped the instant the
+// reel-stops land — see playReelStop() below.
 export function playReelStart(isFastMode) {
   console.log(`[audio hook] playReelStart(isFastMode=${!!isFastMode})`);
   systemAudio.play("uiReelStart");
   if (isFastMode) {
-    themeAudio.playReelTurbo();
+    turboReelStartId = themeAudio.playReelStart();
   } else {
     themeAudio.playReelStart();
   }
 }
 
+// Turbo mode's 3 reelStop drops (Step 51) — GameController quantizes them onto the
+// 16th-note grid so all 3 reels land in genuine unison (see getTurboStopQuantizeDelay()
+// below), which would otherwise read as one flat, phasey hit rather than 3 separate
+// reels. Spreading 2 of the 3 by a fixed pitch offset turns that unison into a small
+// chord instead — reelIndex 0 down a bit, reelIndex 2 up a bit, reelIndex 1 left at its
+// natural recorded pitch. Deterministic by reel position, not random, so it reads the
+// same way every spin.
+const TURBO_REEL_STOP_SEMITONES = { 0: -3, 1: 0, 2: 2 };
+
 // reelIndex: 0-based reel that just landed. symbol: the payline (middle-row) symbol
 // it landed on, so the future audio engine can pick a matching stop sound per symbol.
-// isFastMode: suppressed for the time being — GameController quantizes Turbo reel
-// stops onto the 16th-note grid (see getTurboStopQuantizeDelay() below) so all 3
-// reels land in genuine unison, which would make 3 simultaneous reelStop samples read
-// as one locked-in hit rather than a phasey overlap... in principle. The existing
-// reelStop bank wasn't sound-designed with 3-at-once playback in mind, so this stays
-// off until a chime actually meant for that exists. The quantization itself (the
-// visual landing) is unaffected — only the audio call here is skipped.
+// isFastMode: now plays too (Step 51) — see TURBO_REEL_STOP_SEMITONES above for why
+// simultaneous 3-at-once playback is fine now. The visual landing itself
+// (GameController's quantization) is unaffected either way — this only ever touched
+// the audio call.
 export function playReelStop(reelIndex, symbol, isFastMode) {
   console.log(`[audio hook] playReelStop(reelIndex=${reelIndex}, symbol="${symbol}", isFastMode=${!!isFastMode})`);
-  if (!isFastMode) {
+  if (isFastMode) {
+    themeAudio.playReelStop(TURBO_REEL_STOP_SEMITONES[reelIndex] ?? 0);
+    // Precise cutoff: the turbo reel-start cue (see playReelStart() above) stops the
+    // instant the first of the 3 reelStop drops lands. Turbo's stagger is 0 (all 3
+    // reels share one quantized instant — see GameController.spin()), so in practice
+    // this fires once, right on the drop; turboReelStartId is already null by the time
+    // reel 2 and 3's own onImpact calls reach this line, making them harmless no-ops.
+    if (turboReelStartId !== null) {
+      themeAudio.stopReelStart(turboReelStartId);
+      turboReelStartId = null;
+    }
+  } else {
     themeAudio.playReelStop();
   }
 }
